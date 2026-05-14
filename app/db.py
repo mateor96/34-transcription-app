@@ -73,6 +73,16 @@ async def update_speaker_names(entry_id: str, names: dict) -> bool:
         return cur.rowcount > 0
 
 
+async def update_filename(entry_id: str, filename: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE archive SET filename = ? WHERE id = ?",
+            (filename, entry_id),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
 async def delete_archive_entry(entry_id: str) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("DELETE FROM archive WHERE id = ?", (entry_id,))

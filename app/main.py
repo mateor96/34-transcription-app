@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-from .db import delete_archive_entry, get_archive_entry, init_db, list_archive, update_speaker_names
+from .db import delete_archive_entry, get_archive_entry, init_db, list_archive, update_filename, update_speaker_names
 from .export import to_json, to_markdown, to_srt, to_txt
 from .pipeline import run_pipeline
 
@@ -98,6 +98,14 @@ async def archive_download(entry_id: str, fmt: str):
     if not entry:
         return JSONResponse({"error": "not found"}, status_code=404)
     return _format_response(entry["segments"], fmt)
+
+
+@app.patch("/archive/{entry_id}/rename")
+async def archive_rename(entry_id: str, data: dict):
+    ok = await update_filename(entry_id, data.get("filename", ""))
+    if not ok:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return {"ok": True}
 
 
 @app.patch("/archive/{entry_id}/names")

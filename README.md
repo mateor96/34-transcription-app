@@ -1,4 +1,4 @@
-# 34-transcription-app
+# Nota.ai
 
 A fully local, on-device audio transcription and speaker diarization web app for Apple Silicon Macs. No cloud, no subscriptions, no audio leaving your machine.
 
