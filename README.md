@@ -6,6 +6,14 @@ Built on [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whis
 
 ---
 
+## Why I built this
+
+I tried a lot of transcription tools and never found one I was fully happy with. Notion's transcription came close — transcripts uploaded directly to Notion, no bot joining the call — but it lacks speaker recognition and the free tier runs out fast. Google Meet's Gemini note-taking has the same story. There are free tools out there, but every single one came with at least one trade-off: no speaker labels, cloud uploads, a bot sitting in your meeting, or a subscription wall.
+
+The final straw was transcribing a regular phone call. Suddenly none of the meeting-focused tools applied and I had to go looking for something completely different. That inconsistency is why I built my own tool — one that handles any audio, keeps everything on your machine, and actually tells you who said what.
+
+---
+
 ## Features
 
 - **Transcription** via Whisper Large v3 Turbo — runs on the M-series GPU through Apple MLX
