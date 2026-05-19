@@ -21,9 +21,21 @@ async def init_db() -> None:
                 speaker_names TEXT NOT NULL DEFAULT '{}'
             )
         """)
-        # Migrate existing DBs that don't have the column yet
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                id       INTEGER PRIMARY KEY CHECK (id = 1),
+                provider TEXT NOT NULL DEFAULT 'lmstudio',
+                base_url TEXT NOT NULL DEFAULT 'http://localhost:1234',
+                model    TEXT NOT NULL DEFAULT '',
+                api_key  TEXT NOT NULL DEFAULT ''
+            )
+        """)
         try:
             await db.execute("ALTER TABLE archive ADD COLUMN speaker_names TEXT NOT NULL DEFAULT '{}'")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE archive ADD COLUMN summary TEXT")
         except Exception:
             pass
         await db.commit()
@@ -45,7 +57,9 @@ async def list_archive() -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT id, filename, created_at, duration_s, speaker_count FROM archive ORDER BY created_at DESC"
+            """SELECT id, filename, created_at, duration_s, speaker_count,
+                      CASE WHEN summary IS NOT NULL AND summary != '' THEN 1 ELSE 0 END AS has_summary
+               FROM archive ORDER BY created_at DESC"""
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
@@ -78,6 +92,34 @@ async def update_filename(entry_id: str, filename: str) -> bool:
         cur = await db.execute(
             "UPDATE archive SET filename = ? WHERE id = ?",
             (filename, entry_id),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def get_settings() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT provider, base_url, model, api_key FROM settings WHERE id = 1") as cur:
+            row = await cur.fetchone()
+    if row is None:
+        return {"provider": "lmstudio", "base_url": "http://localhost:1234", "model": "", "api_key": ""}
+    return dict(row)
+
+
+async def save_settings(provider: str, base_url: str, model: str, api_key: str) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO settings (id, provider, base_url, model, api_key) VALUES (1, ?, ?, ?, ?)",
+            (provider, base_url, model, api_key),
+        )
+        await db.commit()
+
+
+async def save_summary(entry_id: str, summary: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE archive SET summary = ? WHERE id = ?", (summary, entry_id)
         )
         await db.commit()
         return cur.rowcount > 0

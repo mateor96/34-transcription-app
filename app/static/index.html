@@ -499,6 +499,218 @@
       min-width: 6ch;
     }
     .chip-input:focus { border-bottom: 1px solid var(--accent); }
+
+    /* ── Settings button ── */
+    .settings-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      line-height: 1;
+      margin-left: 0.5rem;
+      transition: color 0.15s, background 0.15s;
+    }
+    .settings-btn:hover { color: var(--accent); background: var(--surface); }
+
+    /* ── Settings overlay ── */
+    #settings-overlay {
+      position: fixed; inset: 0;
+      background: rgba(45, 42, 38, 0.45);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .settings-panel {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 1.75rem;
+      width: min(480px, calc(100vw - 2rem));
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .settings-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+    .settings-panel-header span {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .settings-close {
+      background: none; border: none;
+      color: var(--muted); cursor: pointer;
+      font-size: 1rem; padding: 0.1rem 0.3rem;
+      border-radius: 3px; line-height: 1;
+      transition: color 0.15s, background 0.15s;
+    }
+    .settings-close:hover { color: var(--accent); background: var(--surface); }
+    .provider-tiles {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .provider-tile {
+      font-family: inherit;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 4px;
+      padding: 0.45rem 0.5rem;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+      text-align: center;
+    }
+    .provider-tile:hover { border-color: var(--accent); color: var(--text); }
+    .provider-tile.active { border-color: var(--accent); background: #f5ece7; color: var(--accent); }
+    #settings-fields { margin-bottom: 1.1rem; }
+    .settings-field { margin-bottom: 0.75rem; }
+    .settings-field label {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 0.3rem;
+    }
+    .settings-field input {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 4px;
+      padding: 0.45rem 0.7rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+      transition: border-color 0.15s;
+      box-sizing: border-box;
+    }
+    .settings-field input:focus { outline: none; border-color: var(--accent); }
+    .key-row { display: flex; gap: 0.4rem; align-items: center; }
+    .key-row input { flex: 1; }
+    .eye-btn {
+      background: none; border: 1.5px solid var(--border);
+      border-radius: 4px; padding: 0.4rem 0.55rem;
+      color: var(--muted); cursor: pointer; font-size: 0.8rem;
+      transition: color 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .eye-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .settings-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    #test-btn {
+      font-family: inherit;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 4px;
+      padding: 0.4rem 0.9rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    #test-btn:hover { color: var(--accent); border-color: var(--accent); }
+    #test-result {
+      font-size: 0.78rem;
+      flex: 1;
+      transition: color 0.2s;
+    }
+    #test-result.ok    { color: #3d6b50; }
+    #test-result.error { color: var(--accent); }
+    #settings-save-btn {
+      font-family: inherit;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: var(--accent);
+      border: 1.5px solid var(--accent);
+      border-radius: 4px;
+      padding: 0.4rem 1.1rem;
+      color: var(--bg);
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    #settings-save-btn:hover { background: var(--accent-h); }
+    .settings-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    /* ── Summary panel ── */
+    #summary-section {
+      border: 1.5px solid var(--border);
+      border-radius: 5px;
+      margin-bottom: 1.1rem;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .summary-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.9rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.1s;
+    }
+    .summary-header:hover { background: rgba(0,0,0,0.03); }
+    .summary-header span:first-child {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .summary-chevron { font-size: 0.75rem; color: var(--muted); transition: transform 0.2s; }
+    .summary-chevron.collapsed { transform: rotate(-90deg); }
+    #summary-body { padding: 0 0.9rem 0.9rem; }
+    #summary-content {
+      font-size: 0.9rem;
+      line-height: 1.65;
+      color: var(--text);
+    }
+    #summary-content ul { padding-left: 1.1rem; margin: 0; }
+    #summary-content li { margin-bottom: 0.25rem; }
+    .summary-loading {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 0.2rem 0;
+    }
+    .summary-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #summary-error { font-size: 0.82rem; color: var(--accent); padding: 0.2rem 0; }
+    .summarize-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
+    .summarize-btn:hover { background: #f5ece7 !important; }
   </style>
 </head>
 <body>
@@ -511,6 +723,7 @@
       <div class="tab active" onclick="switchTab('transcribe')">New</div>
       <div class="tab" onclick="switchTab('archive')">Archive</div>
     </div>
+    <button class="settings-btn" onclick="openSettings()" title="AI Provider Settings">⚙</button>
   </header>
 
   <div id="archive-view">
@@ -582,6 +795,22 @@
       <button class="rename-title-btn" onclick="activateRenameTitle()" title="Rename"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5a1.414 1.414 0 0 1 2 2L3.5 10.5 1 11l.5-2.5 7-7z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
     <audio id="audio-player" controls></audio>
+
+    <div id="summary-section" style="display:none">
+      <div class="summary-header" onclick="toggleSummaryPanel()">
+        <span>Summary</span>
+        <span class="summary-chevron" id="summary-chevron">▾</span>
+      </div>
+      <div id="summary-body">
+        <div id="summary-loading" class="summary-loading" style="display:none">
+          <div class="summary-spinner"></div>
+          <span id="summary-stage-text">Summarizing…</span>
+        </div>
+        <div id="summary-content"></div>
+        <div id="summary-error" style="display:none"></div>
+      </div>
+    </div>
+
     <div id="speaker-legend"></div>
     <div class="transcript-bar">
       <span>Transcript</span>
@@ -590,10 +819,28 @@
         <button class="dl-btn" onclick="dlFile('txt')"><svg width="10" height="11" viewBox="0 0 10 11" fill="none"><path d="M5 1v7M2 8l3 3 3-3M1 10h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>TXT</button>
         <button class="dl-btn" onclick="dlFile('md')"><svg width="10" height="11" viewBox="0 0 10 11" fill="none"><path d="M5 1v7M2 8l3 3 3-3M1 10h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Markdown</button>
         <button class="dl-btn" onclick="dlPDF()"><svg width="10" height="11" viewBox="0 0 10 11" fill="none"><path d="M5 1v7M2 8l3 3 3-3M1 10h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF</button>
+        <button class="dl-btn summarize-btn" id="summarize-btn" onclick="requestSummary()">✦ Summarize</button>
       </div>
     </div>
     <div id="transcript"></div>
   </section>
+
+  <div id="settings-overlay" style="display:none" onclick="closeSettingsIfOutside(event)">
+    <div class="settings-panel">
+      <div class="settings-panel-header">
+        <span>AI Provider</span>
+        <button class="settings-close" onclick="closeSettings()">✕</button>
+      </div>
+      <div class="provider-tiles" id="provider-tiles"></div>
+      <div id="settings-fields"></div>
+      <div class="settings-actions">
+        <button id="test-btn" onclick="testProvider()">Test Connection</button>
+        <span id="test-result"></span>
+        <button id="settings-save-btn" onclick="saveSettings()">Save</button>
+      </div>
+      <div class="settings-note">Key stored locally on this device</div>
+    </div>
+  </div>
 
   <script>
     const dropZone      = document.getElementById('drop-zone');
@@ -694,6 +941,7 @@
 
     function showSegments(segments, savedNames = {}) {
       speakerNames = {};
+      resetSummaryPanel();
       const seen = [];
       segments.forEach(s => { if (!seen.includes(s.speaker)) seen.push(s.speaker); });
       renderLegend(seen, savedNames);
@@ -866,12 +1114,13 @@
       }
       el.innerHTML = entries.map(e => {
         const date = new Date(e.created_at).toLocaleDateString('de-DE', { day:'2-digit', month:'short', year:'numeric' });
-        const dur  = fmtDuration(e.duration_s);
-        const spk  = e.speaker_count === 1 ? '1 speaker' : `${e.speaker_count} speakers`;
+        const dur     = fmtDuration(e.duration_s);
+        const spk     = e.speaker_count === 1 ? '1 speaker' : `${e.speaker_count} speakers`;
+        const sumBadge = e.has_summary ? ' &middot; <span style="color:var(--accent)">✦</span>' : '';
         return `<div class="archive-entry" onclick="loadArchiveEntry('${e.id}')">
           <div style="min-width:0">
             <div class="entry-name">${escapeHtml(e.filename)}</div>
-            <div class="entry-meta">${dur} &middot; ${spk}</div>
+            <div class="entry-meta">${dur} &middot; ${spk}${sumBadge}</div>
           </div>
           <div class="entry-right">
             <div class="entry-date">${date}</div>
@@ -892,6 +1141,11 @@
       document.getElementById('archive-view').style.display = 'none';
       document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
       resultSec.style.display = 'block';
+      if (entry.summary) {
+        document.getElementById('summary-section').style.display = 'block';
+        renderSummaryText(entry.summary);
+        document.getElementById('summarize-btn').textContent = '↻ Regenerate';
+      }
     }
 
     async function deleteEntry(evt, id) {
@@ -1109,6 +1363,276 @@
       clearInterval(timerInterval);
       timerInterval = null;
       document.getElementById('record-timer').textContent = '00:00:00';
+    }
+
+    // ── Settings ──────────────────────────────────────────────────────────────
+
+    const PROVIDERS = [
+      { id: 'lmstudio',  label: 'LM Studio' },
+      { id: 'ollama',    label: 'Ollama' },
+      { id: 'gemini',    label: 'Gemini' },
+      { id: 'anthropic', label: 'Anthropic' },
+      { id: 'openai',    label: 'OpenAI' },
+    ];
+
+    const LOCAL_PROVIDERS  = new Set(['lmstudio', 'ollama']);
+    const DEFAULT_URLS     = { lmstudio: 'http://localhost:1234', ollama: 'http://localhost:11434' };
+    const DEFAULT_MODELS   = { lmstudio: '', ollama: 'llama3.2:3b', gemini: 'gemini-2.5-flash-lite', anthropic: 'claude-3-5-haiku-20241022', openai: 'gpt-4o-mini' };
+    const MODEL_HINTS      = { lmstudio: 'auto-detect', ollama: 'llama3.2:3b', gemini: 'gemini-2.5-flash-lite', anthropic: 'claude-3-5-haiku-20241022', openai: 'gpt-4o-mini' };
+
+    let _settingsProvider = 'lmstudio';
+    let _savedApiKey = '';  // tracks whether a key is already saved (so we don't wipe it)
+
+    async function openSettings() {
+      const overlay = document.getElementById('settings-overlay');
+      overlay.style.display = 'flex';
+      document.getElementById('test-result').textContent = '';
+      document.getElementById('test-result').className = 'test-result';
+
+      const cfg = await fetch('/settings').then(r => r.json());
+      _settingsProvider = cfg.provider || 'lmstudio';
+      _savedApiKey = cfg.api_key_set ? '__saved__' : '';
+
+      renderProviderTiles(_settingsProvider);
+      renderSettingsFields(_settingsProvider, cfg);
+    }
+
+    function closeSettings() {
+      document.getElementById('settings-overlay').style.display = 'none';
+    }
+
+    function closeSettingsIfOutside(e) {
+      if (e.target === document.getElementById('settings-overlay')) closeSettings();
+    }
+
+    function renderProviderTiles(active) {
+      document.getElementById('provider-tiles').innerHTML = PROVIDERS.map(p =>
+        `<button class="provider-tile${p.id === active ? ' active' : ''}" onclick="selectProvider('${p.id}')">${p.label}</button>`
+      ).join('');
+    }
+
+    function renderSettingsFields(provider, cfg = {}) {
+      const fields = document.getElementById('settings-fields');
+      const isLocal = LOCAL_PROVIDERS.has(provider);
+
+      if (isLocal) {
+        const urlVal   = cfg.base_url || DEFAULT_URLS[provider] || '';
+        const modelVal = cfg.model || '';
+        fields.innerHTML = `
+          <div class="settings-field">
+            <label>Base URL</label>
+            <input type="text" id="sf-url" value="${escapeHtml(urlVal)}" placeholder="${DEFAULT_URLS[provider]}">
+          </div>
+          <div class="settings-field">
+            <label>Model</label>
+            <input type="text" id="sf-model" value="${escapeHtml(modelVal)}" placeholder="${MODEL_HINTS[provider]}">
+          </div>`;
+      } else {
+        const keyPlaceholder = cfg.api_key_set ? '••••••••••••••••••••' : 'Enter API key';
+        const modelVal = cfg.model || DEFAULT_MODELS[provider] || '';
+        fields.innerHTML = `
+          <div class="settings-field">
+            <label>API Key</label>
+            <div class="key-row">
+              <input type="password" id="sf-key" placeholder="${keyPlaceholder}" autocomplete="off">
+              <button class="eye-btn" onclick="toggleKeyVisibility()" id="eye-btn">👁</button>
+            </div>
+          </div>
+          <div class="settings-field">
+            <label>Model</label>
+            <input type="text" id="sf-model" value="${escapeHtml(modelVal)}" placeholder="${MODEL_HINTS[provider]}">
+          </div>`;
+      }
+      document.getElementById('test-result').textContent = '';
+      document.getElementById('test-result').className = 'test-result';
+    }
+
+    function selectProvider(provider) {
+      _settingsProvider = provider;
+      _savedApiKey = '';
+      renderProviderTiles(provider);
+      renderSettingsFields(provider);
+    }
+
+    function toggleKeyVisibility() {
+      const inp = document.getElementById('sf-key');
+      const btn = document.getElementById('eye-btn');
+      if (!inp) return;
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+    }
+
+    function collectSettingsPayload() {
+      const isLocal = LOCAL_PROVIDERS.has(_settingsProvider);
+      const payload = { provider: _settingsProvider };
+      if (isLocal) {
+        payload.base_url = (document.getElementById('sf-url')?.value || '').trim();
+        payload.model    = (document.getElementById('sf-model')?.value || '').trim();
+        payload.api_key  = '';
+      } else {
+        const keyInput = document.getElementById('sf-key')?.value || '';
+        payload.api_key = keyInput || (_savedApiKey === '__saved__' ? '__keep__' : '');
+        payload.model   = (document.getElementById('sf-model')?.value || '').trim();
+        payload.base_url = '';
+      }
+      return payload;
+    }
+
+    async function testProvider() {
+      const payload = collectSettingsPayload();
+      const btn = document.getElementById('test-btn');
+      const res = document.getElementById('test-result');
+      btn.disabled = true;
+      res.textContent = 'Testing…';
+      res.className = 'test-result';
+
+      const data = await fetch('/settings/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).then(r => r.json());
+
+      btn.disabled = false;
+      res.textContent = data.ok ? '✓ ' + data.message : '✗ ' + data.message;
+      res.className = 'test-result ' + (data.ok ? 'ok' : 'error');
+    }
+
+    async function saveSettings() {
+      const payload = collectSettingsPayload();
+      // Don't overwrite saved key if field was left blank
+      if (payload.api_key === '__keep__') {
+        const saved = await fetch('/settings').then(r => r.json());
+        // Keep existing key — only update provider/model
+        const updatePayload = { provider: payload.provider, base_url: payload.base_url, model: payload.model };
+        await fetch('/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatePayload),
+        });
+      } else {
+        await fetch('/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+      _savedApiKey = payload.api_key ? '__saved__' : _savedApiKey;
+      const btn = document.getElementById('settings-save-btn');
+      const prev = btn.textContent;
+      btn.textContent = 'Saved ✓';
+      btn.style.background = '#3d6b50';
+      btn.style.borderColor = '#3d6b50';
+      setTimeout(() => {
+        btn.textContent = prev;
+        btn.style.background = '';
+        btn.style.borderColor = '';
+      }, 2000);
+    }
+
+    // ── Summarize ─────────────────────────────────────────────────────────────
+
+    let _summaryEs = null;
+
+    async function requestSummary() {
+      if (!currentJobId) return;
+
+      // Check provider is configured
+      const cfg = await fetch('/settings').then(r => r.json());
+      const summarySection  = document.getElementById('summary-section');
+      const summaryContent  = document.getElementById('summary-content');
+      const summaryLoading  = document.getElementById('summary-loading');
+      const summaryError    = document.getElementById('summary-error');
+      const summarizeBtn    = document.getElementById('summarize-btn');
+
+      summarySection.style.display = 'block';
+      document.getElementById('summary-chevron').classList.remove('collapsed');
+      document.getElementById('summary-body').style.display = '';
+
+      if (!cfg.provider) {
+        summaryContent.innerHTML = '';
+        summaryLoading.style.display = 'none';
+        summaryError.style.display = 'block';
+        summaryError.innerHTML = 'No AI provider configured. Open Settings (⚙ top right) to set one up.';
+        return;
+      }
+
+      summaryError.style.display = 'none';
+      summaryLoading.style.display = 'flex';
+      document.getElementById('summary-stage-text').textContent = 'Summarizing…';
+      summaryContent.innerHTML = '';
+      summarizeBtn.disabled = true;
+
+      if (_summaryEs) { _summaryEs.close(); _summaryEs = null; }
+
+      let accumulated = '';
+      _summaryEs = new EventSource(`/summarize/${currentJobId}`);
+      _summaryEs.onmessage = e => {
+        const data = JSON.parse(e.data);
+        if (data.type === 'token') {
+          accumulated += data.text;
+          summaryContent.textContent = accumulated;
+        }
+        if (data.type === 'done') {
+          _summaryEs.close(); _summaryEs = null;
+          summaryLoading.style.display = 'none';
+          renderSummaryText(data.summary);
+          summarizeBtn.textContent = '↻ Regenerate';
+          summarizeBtn.disabled = false;
+        }
+        if (data.type === 'error') {
+          _summaryEs.close(); _summaryEs = null;
+          summaryLoading.style.display = 'none';
+          summaryContent.innerHTML = '';
+          summaryError.style.display = 'block';
+          summaryError.textContent = data.message;
+          summarizeBtn.disabled = false;
+        }
+      };
+      _summaryEs.onerror = () => {
+        _summaryEs.close(); _summaryEs = null;
+        summaryLoading.style.display = 'none';
+        summaryError.style.display = 'block';
+        summaryError.textContent = 'Connection error — is the server running?';
+        summarizeBtn.disabled = false;
+      };
+    }
+
+    function renderSummaryText(text) {
+      const content = document.getElementById('summary-content');
+      if (!text) { content.textContent = ''; return; }
+      // Convert lines starting with - or • into an <ul>
+      const lines = text.split('\n').filter(l => l.trim());
+      const hasBullets = lines.some(l => /^[-•*]/.test(l.trim()));
+      if (hasBullets) {
+        const items = lines.map(l => {
+          const trimmed = l.trim().replace(/^[-•*]\s*/, '');
+          return trimmed ? `<li>${escapeHtml(trimmed)}</li>` : '';
+        }).join('');
+        content.innerHTML = `<ul>${items}</ul>`;
+      } else {
+        content.innerHTML = lines.map(l => `<p>${escapeHtml(l)}</p>`).join('');
+      }
+    }
+
+    function toggleSummaryPanel() {
+      const body    = document.getElementById('summary-body');
+      const chevron = document.getElementById('summary-chevron');
+      const hidden  = body.style.display === 'none';
+      body.style.display = hidden ? '' : 'none';
+      chevron.classList.toggle('collapsed', !hidden);
+    }
+
+    function resetSummaryPanel() {
+      document.getElementById('summary-section').style.display = 'none';
+      document.getElementById('summary-content').innerHTML = '';
+      document.getElementById('summary-loading').style.display = 'none';
+      document.getElementById('summary-error').style.display = 'none';
+      document.getElementById('summary-body').style.display = '';
+      document.getElementById('summary-chevron').classList.remove('collapsed');
+      const btn = document.getElementById('summarize-btn');
+      btn.textContent = '✦ Summarize';
+      btn.disabled = false;
+      if (_summaryEs) { _summaryEs.close(); _summaryEs = null; }
     }
   </script>
 </body>
