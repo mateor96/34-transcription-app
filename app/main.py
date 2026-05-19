@@ -101,6 +101,20 @@ async def archive_get(entry_id: str):
     return entry
 
 
+# Browser-friendly MIME types — Python's defaults (e.g. audio/mp4a-latm for .m4a)
+# aren't recognized by HTML5 audio.
+_AUDIO_MIME = {
+    ".m4a":  "audio/mp4",
+    ".mp4":  "video/mp4",
+    ".mp3":  "audio/mpeg",
+    ".wav":  "audio/wav",
+    ".webm": "audio/webm",
+    ".ogg":  "audio/ogg",
+    ".aac":  "audio/aac",
+    ".flac": "audio/flac",
+}
+
+
 @app.get("/archive/{entry_id}/audio")
 async def archive_audio(entry_id: str):
     entry = await get_archive_entry(entry_id)
@@ -112,7 +126,7 @@ async def archive_audio(entry_id: str):
     path = AUDIO_DIR / f"{entry_id}{ext}"
     if not path.exists():
         return JSONResponse({"error": "audio file missing"}, status_code=404)
-    media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+    media_type = _AUDIO_MIME.get(ext.lower()) or mimetypes.guess_type(str(path))[0] or "application/octet-stream"
     return FileResponse(path, media_type=media_type)
 
 
