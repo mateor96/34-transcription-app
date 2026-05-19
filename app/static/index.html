@@ -1157,7 +1157,7 @@
       const entry  = await fetch(`/archive/${id}`).then(r => r.json());
       currentJobId = id;
       isLiveJob    = false;
-      audioPlayer.src = '';
+      audioPlayer.src = entry.audio_ext ? `/archive/${id}/audio` : '';
       setResultTitle(entry.filename || '');
       showSegments(entry.segments, entry.speaker_names || {});
       document.getElementById('archive-view').style.display = 'none';

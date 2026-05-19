@@ -4,11 +4,13 @@ from pathlib import Path
 
 import aiosqlite
 
-DB_PATH = Path.home() / ".transcribe" / "archive.db"
+DB_PATH   = Path.home() / ".transcribe" / "archive.db"
+AUDIO_DIR = Path.home() / ".transcribe" / "audio"
 
 
 async def init_db() -> None:
     DB_PATH.parent.mkdir(exist_ok=True)
+    AUDIO_DIR.mkdir(exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS archive (
@@ -38,17 +40,22 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE archive ADD COLUMN summary TEXT")
         except Exception:
             pass
+        try:
+            await db.execute("ALTER TABLE archive ADD COLUMN audio_ext TEXT")
+        except Exception:
+            pass
         await db.commit()
 
 
-async def save_transcription(job_id: str, filename: str, segments: list) -> None:
+async def save_transcription(job_id: str, filename: str, segments: list, audio_ext: str | None = None) -> None:
     duration = segments[-1]["end"] if segments else 0
     speakers = len({s["speaker"] for s in segments})
     created_at = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT INTO archive VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (job_id, filename, created_at, duration, speakers, json.dumps(segments), "{}"),
+            """INSERT INTO archive (id, filename, created_at, duration_s, speaker_count, result_json, speaker_names, audio_ext)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (job_id, filename, created_at, duration, speakers, json.dumps(segments), "{}", audio_ext),
         )
         await db.commit()
 
@@ -127,6 +134,14 @@ async def save_summary(entry_id: str, summary: str) -> bool:
 
 async def delete_archive_entry(entry_id: str) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT audio_ext FROM archive WHERE id = ?", (entry_id,)) as cur:
+            row = await cur.fetchone()
         cur = await db.execute("DELETE FROM archive WHERE id = ?", (entry_id,))
         await db.commit()
+        if cur.rowcount > 0 and row and row[0]:
+            audio_path = AUDIO_DIR / f"{entry_id}{row[0]}"
+            try:
+                audio_path.unlink()
+            except OSError:
+                pass
         return cur.rowcount > 0

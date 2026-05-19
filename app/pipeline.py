@@ -1,13 +1,15 @@
 import asyncio
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import ffmpeg
 
 from .transcribe import transcribe
 from .diarize import diarize
 from .merge import merge
-from .db import save_transcription
+from .db import AUDIO_DIR, save_transcription
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
@@ -64,7 +66,17 @@ async def run_pipeline(
 
         job["result"] = segments
         job["status"] = "done"
-        await save_transcription(job_id, filename, segments)
+
+        # Persist the original audio alongside the transcript so click-to-seek
+        # works on archived entries.
+        audio_ext = Path(filename).suffix or Path(audio_path).suffix or ".audio"
+        persisted_audio = AUDIO_DIR / f"{job_id}{audio_ext}"
+        try:
+            shutil.move(audio_path, persisted_audio)
+        except OSError:
+            audio_ext = None  # move failed — record entry without audio
+
+        await save_transcription(job_id, filename, segments, audio_ext)
         await emit({"stage": "done", "pct": 100, "message": "Done!"})
 
     except Exception as exc:
@@ -72,9 +84,14 @@ async def run_pipeline(
         await emit({"stage": "error", "message": str(exc)})
 
     finally:
-        for path in (audio_path, wav_path):
+        # WAV is always temporary; audio_path may have been moved to AUDIO_DIR.
+        try:
+            os.unlink(wav_path)
+        except OSError:
+            pass
+        if os.path.exists(audio_path):
             try:
-                os.unlink(path)
+                os.unlink(audio_path)
             except OSError:
                 pass
         await job["queue"].put(None)  # sentinel — tells SSE stream to close

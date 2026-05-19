@@ -1,5 +1,6 @@
 import asyncio
 import json
+import mimetypes
 import tempfile
 
 import httpx
@@ -10,12 +11,12 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, File, Query, UploadFile
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
 from .db import (
-    delete_archive_entry, get_archive_entry, get_settings, init_db,
+    AUDIO_DIR, delete_archive_entry, get_archive_entry, get_settings, init_db,
     list_archive, save_settings, save_summary, update_filename, update_speaker_names,
 )
 from .export import to_json, to_markdown, to_srt, to_txt
@@ -98,6 +99,21 @@ async def archive_get(entry_id: str):
     if not entry:
         return JSONResponse({"error": "not found"}, status_code=404)
     return entry
+
+
+@app.get("/archive/{entry_id}/audio")
+async def archive_audio(entry_id: str):
+    entry = await get_archive_entry(entry_id)
+    if not entry:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    ext = entry.get("audio_ext")
+    if not ext:
+        return JSONResponse({"error": "audio not stored"}, status_code=404)
+    path = AUDIO_DIR / f"{entry_id}{ext}"
+    if not path.exists():
+        return JSONResponse({"error": "audio file missing"}, status_code=404)
+    media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type)
 
 
 @app.get("/archive/{entry_id}/download/{fmt}")
