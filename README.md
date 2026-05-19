@@ -4,13 +4,7 @@ A fully local, on-device audio transcription and speaker diarization web app for
 
 Built on [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) for transcription and [pyannote.audio](https://github.com/pyannote/pyannote-audio) for speaker separation.
 
----
-
-## Why I built this
-
-I tried a lot of transcription tools and never found one I was fully happy with. Notion's transcription came close — transcripts uploaded directly to Notion, no bot joining the call — but it lacks speaker recognition and the free tier runs out fast. Google Meet's Gemini note-taking has the same story. There are free tools out there, but every single one came with at least one trade-off: no speaker labels, cloud uploads, a bot sitting in your meeting, or a subscription wall.
-
-The final straw was transcribing a regular phone call. Suddenly none of the meeting-focused tools applied and I had to go looking for something completely different. That inconsistency is why I built my own tool — one that handles any audio, keeps everything on your machine, and actually tells you who said what.
+Handles any audio — meetings, phone calls, voice memos, interviews — without a bot in the call, a cloud upload, or a subscription.
 
 ---
 
@@ -18,6 +12,7 @@ The final straw was transcribing a regular phone call. Suddenly none of the meet
 
 - **Transcription** via Whisper Large v3 Turbo — runs on the M-series GPU through Apple MLX
 - **Speaker diarization** via pyannote community-1 — separates and labels each speaker
+- **AI summaries** — one-click meeting summaries via LM Studio, Ollama, Gemini, Anthropic, or OpenAI
 - **Live recording** — record directly from any audio input (mic, BlackHole, etc.)
 - **Archive** — all past transcriptions saved locally in SQLite, accessible anytime
 - **Speaker renaming** — rename Speaker 00 / Speaker 01 to real names; persists per transcript
@@ -86,6 +81,27 @@ To record both sides of a call with headphones, install [BlackHole](https://gith
 5. In Google Meet (or any call tool): set the speaker output to this Multi-Output Device
 
 After that, select **BlackHole 2ch** as the audio source in the app's Record tab and hit Start. You'll hear the call normally through your headphones; the app captures everything in the background.
+
+---
+
+## Summaries (optional)
+
+Click **✦ Summarize** on any transcript to get a bullet-point summary of the meeting. Configure the LLM provider via the **⚙** icon in the header.
+
+**Local providers** — no API key, runs entirely offline:
+
+- **LM Studio** *(default)* — install [LM Studio](https://lmstudio.ai), load a chat model, start its local server. URL: `http://localhost:1234`
+- **Ollama** — install [Ollama](https://ollama.com), pull a model (e.g. `ollama pull llama3.2:3b`). URL: `http://localhost:11434`
+
+**Cloud providers** — require an API key and one extra install:
+
+```bash
+uv add anthropic     # Claude
+uv add openai        # GPT
+uv add google-genai  # Gemini
+```
+
+API keys are stored locally in SQLite (`~/.transcribe/archive.db`). Audio and transcripts never leave your machine unless you point Nota.ai at a cloud LLM — and even then, only the transcript text is sent.
 
 ---
 
