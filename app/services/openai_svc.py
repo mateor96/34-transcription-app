@@ -5,7 +5,7 @@ from .exceptions import ProviderAuthError, ProviderModelError, ProviderUnavailab
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "gpt-5-mini"
 
 
 class OpenAIService:
