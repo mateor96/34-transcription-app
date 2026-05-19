@@ -597,6 +597,26 @@
       box-sizing: border-box;
     }
     .settings-field input:focus { outline: none; border-color: var(--accent); }
+    .settings-field select {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 4px;
+      padding: 0.45rem 0.7rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+    .settings-field select:focus { outline: none; border-color: var(--accent); }
+    .settings-field select:disabled { opacity: 0.5; cursor: not-allowed; }
+    .model-hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+    .model-hint.error { color: var(--accent); }
     .key-row { display: flex; gap: 0.4rem; align-items: center; }
     .key-row input { flex: 1; }
     .eye-btn {
@@ -1377,10 +1397,8 @@
       { id: 'openai',    label: 'OpenAI' },
     ];
 
-    const LOCAL_PROVIDERS  = new Set(['lmstudio', 'ollama']);
-    const DEFAULT_URLS     = { lmstudio: 'http://localhost:1234', ollama: 'http://localhost:11434' };
-    const DEFAULT_MODELS   = { lmstudio: '', ollama: 'llama3.2:3b', gemini: 'gemini-2.5-flash-lite', anthropic: 'claude-3-5-haiku-20241022', openai: 'gpt-4o-mini' };
-    const MODEL_HINTS      = { lmstudio: 'auto-detect', ollama: 'llama3.2:3b', gemini: 'gemini-2.5-flash-lite', anthropic: 'claude-3-5-haiku-20241022', openai: 'gpt-4o-mini' };
+    const LOCAL_PROVIDERS = new Set(['lmstudio', 'ollama']);
+    const DEFAULT_URLS    = { lmstudio: 'http://localhost:1234', ollama: 'http://localhost:11434' };
 
     let _settingsProvider = 'lmstudio';
     let _savedApiKey = '';  // tracks whether a key is already saved (so we don't wipe it)
@@ -1396,7 +1414,20 @@
       _savedApiKey = cfg.api_key_set ? '__saved__' : '';
 
       renderProviderTiles(_settingsProvider);
-      renderSettingsFields(_settingsProvider, cfg);
+      await renderSettingsFields(_settingsProvider, cfg);
+    }
+
+    async function fetchModels(provider, baseUrl) {
+      try {
+        const res = await fetch('/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, base_url: baseUrl || '' }),
+        });
+        return await res.json();
+      } catch (e) {
+        return { models: [], error: String(e) };
+      }
     }
 
     function closeSettings() {
@@ -1413,13 +1444,12 @@
       ).join('');
     }
 
-    function renderSettingsFields(provider, cfg = {}) {
+    async function renderSettingsFields(provider, cfg = {}) {
       const fields = document.getElementById('settings-fields');
       const isLocal = LOCAL_PROVIDERS.has(provider);
+      const urlVal = cfg.base_url || DEFAULT_URLS[provider] || '';
 
       if (isLocal) {
-        const urlVal   = cfg.base_url || DEFAULT_URLS[provider] || '';
-        const modelVal = cfg.model || '';
         fields.innerHTML = `
           <div class="settings-field">
             <label>Base URL</label>
@@ -1427,11 +1457,12 @@
           </div>
           <div class="settings-field">
             <label>Model</label>
-            <input type="text" id="sf-model" value="${escapeHtml(modelVal)}" placeholder="${MODEL_HINTS[provider]}">
+            <select id="sf-model" disabled><option>Loading…</option></select>
+            <div class="model-hint" id="sf-model-hint"></div>
           </div>`;
+        document.getElementById('sf-url').addEventListener('blur', () => populateModelDropdown(provider, cfg.model));
       } else {
         const keyPlaceholder = cfg.api_key_set ? '••••••••••••••••••••' : 'Enter API key';
-        const modelVal = cfg.model || DEFAULT_MODELS[provider] || '';
         fields.innerHTML = `
           <div class="settings-field">
             <label>API Key</label>
@@ -1442,18 +1473,57 @@
           </div>
           <div class="settings-field">
             <label>Model</label>
-            <input type="text" id="sf-model" value="${escapeHtml(modelVal)}" placeholder="${MODEL_HINTS[provider]}">
+            <select id="sf-model" disabled><option>Loading…</option></select>
+            <div class="model-hint" id="sf-model-hint"></div>
           </div>`;
       }
       document.getElementById('test-result').textContent = '';
       document.getElementById('test-result').className = 'test-result';
+
+      await populateModelDropdown(provider, cfg.model);
     }
 
-    function selectProvider(provider) {
+    async function populateModelDropdown(provider, savedModel) {
+      const select = document.getElementById('sf-model');
+      const hint   = document.getElementById('sf-model-hint');
+      if (!select) return;
+      const baseUrl = LOCAL_PROVIDERS.has(provider) ? (document.getElementById('sf-url')?.value || DEFAULT_URLS[provider]) : '';
+      select.disabled = true;
+      select.innerHTML = '<option>Loading…</option>';
+      hint.textContent = '';
+      hint.className = 'model-hint';
+
+      const { models = [], error } = await fetchModels(provider, baseUrl);
+
+      if (error) {
+        select.innerHTML = '<option value="">— unavailable —</option>';
+        hint.textContent = error;
+        hint.className = 'model-hint error';
+        return;
+      }
+      if (models.length === 0) {
+        select.innerHTML = '<option value="">— no models found —</option>';
+        if (provider === 'lmstudio') hint.textContent = 'Load a model in LM Studio and try again.';
+        if (provider === 'ollama')   hint.textContent = 'Pull a model first, e.g. `ollama pull llama3.2:3b`.';
+        return;
+      }
+
+      const options = models.map(m =>
+        `<option value="${escapeHtml(m)}"${m === savedModel ? ' selected' : ''}>${escapeHtml(m)}</option>`
+      );
+      // If saved model is not in the fetched list, add it as a sticky option so it stays selected
+      if (savedModel && !models.includes(savedModel)) {
+        options.unshift(`<option value="${escapeHtml(savedModel)}" selected>${escapeHtml(savedModel)} (saved, not currently available)</option>`);
+      }
+      select.innerHTML = options.join('');
+      select.disabled = false;
+    }
+
+    async function selectProvider(provider) {
       _settingsProvider = provider;
       _savedApiKey = '';
       renderProviderTiles(provider);
-      renderSettingsFields(provider);
+      await renderSettingsFields(provider);
     }
 
     function toggleKeyVisibility() {

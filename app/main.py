@@ -2,6 +2,8 @@ import asyncio
 import json
 import tempfile
 
+import httpx
+
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -190,6 +192,62 @@ async def api_test_provider(body: dict):
         return {"ok": False, "message": str(e)}
     except Exception as e:
         return {"ok": False, "message": str(e)}
+
+
+_CLOUD_MODELS = {
+    "anthropic": [
+        "claude-sonnet-4-5",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022",
+        "claude-3-opus-20240229",
+    ],
+    "openai": [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4-turbo",
+        "gpt-3.5-turbo",
+    ],
+    "gemini": [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-pro",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+    ],
+}
+
+
+@app.post("/models")
+async def list_models(body: dict):
+    provider = body.get("provider", "")
+    base_url = (body.get("base_url") or "").rstrip("/")
+
+    if provider in _CLOUD_MODELS:
+        return {"models": _CLOUD_MODELS[provider]}
+
+    if provider == "lmstudio":
+        url = base_url or "http://localhost:1234"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{url}/v1/models")
+                resp.raise_for_status()
+                data = resp.json()
+                return {"models": [m["id"] for m in data.get("data", []) if "id" in m]}
+        except Exception as e:
+            return {"models": [], "error": f"Cannot reach LM Studio at {url}: {e}"}
+
+    if provider == "ollama":
+        url = base_url or "http://localhost:11434"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{url}/api/tags")
+                resp.raise_for_status()
+                data = resp.json()
+                return {"models": [m["name"] for m in data.get("models", []) if "name" in m]}
+        except Exception as e:
+            return {"models": [], "error": f"Cannot reach Ollama at {url}: {e}"}
+
+    return {"models": []}
 
 
 # ── Summarize ─────────────────────────────────────────────────────────────────
