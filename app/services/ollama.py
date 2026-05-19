@@ -36,12 +36,18 @@ class OllamaService:
                 async with client.stream(
                     "POST", f"{self.base_url}/api/chat", json=payload
                 ) as response:
-                    if response.status_code == 404:
+                    if response.status_code >= 400:
+                        await response.aread()
+                        body = (response.text or "").strip()
+                        if response.status_code == 404:
+                            raise ProviderModelError(
+                                f"Model '{self.model}' not found. Run: ollama pull {self.model}",
+                                provider=self.provider_name(),
+                            )
                         raise ProviderModelError(
-                            f"Model '{self.model}' not found. Run: ollama pull {self.model}",
+                            f"Ollama rejected the request: {body[:300] or 'no detail'}",
                             provider=self.provider_name(),
                         )
-                    response.raise_for_status()
                     async for line in response.aiter_lines():
                         if not line:
                             continue

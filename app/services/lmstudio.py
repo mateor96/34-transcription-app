@@ -12,6 +12,19 @@ DEFAULT_BASE_URL = "http://localhost:1234"
 DEFAULT_MODEL = ""  # empty = use whatever LM Studio has loaded
 
 
+def _extract_error_message(body: str) -> str:
+    try:
+        data = json.loads(body)
+        err = data.get("error") if isinstance(data, dict) else None
+        if isinstance(err, dict):
+            return err.get("message") or str(err)
+        if isinstance(err, str):
+            return err
+    except json.JSONDecodeError:
+        pass
+    return (body or "no detail").strip()[:300]
+
+
 class LMStudioService:
     def __init__(self, base_url: str = DEFAULT_BASE_URL, model: str = DEFAULT_MODEL):
         self.base_url = (base_url or DEFAULT_BASE_URL).rstrip("/")
@@ -38,12 +51,19 @@ class LMStudioService:
                 async with client.stream(
                     "POST", f"{self.base_url}/v1/chat/completions", json=payload
                 ) as response:
-                    if response.status_code == 404:
+                    if response.status_code >= 400:
+                        await response.aread()
+                        body = response.text
+                        msg = _extract_error_message(body)
+                        if response.status_code == 404:
+                            raise ProviderModelError(
+                                f"Model not found in LM Studio: {msg}",
+                                provider=self.provider_name(),
+                            )
                         raise ProviderModelError(
-                            f"Model '{self.model}' not found in LM Studio.",
+                            f"LM Studio rejected the request: {msg}",
                             provider=self.provider_name(),
                         )
-                    response.raise_for_status()
                     async for line in response.aiter_lines():
                         if not line.startswith("data: "):
                             continue
