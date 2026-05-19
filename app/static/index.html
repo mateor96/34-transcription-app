@@ -43,6 +43,7 @@
     }
 
     .header-left { display: flex; align-items: baseline; gap: 0.6rem; }
+    .header-right { display: flex; align-items: center; gap: 0.4rem; }
 
     header h1 {
       font-family: Georgia, 'Times New Roman', serif;
@@ -502,18 +503,17 @@
 
     /* ── Settings button ── */
     .settings-btn {
-      background: none;
-      border: none;
+      font-size: 0.95rem;
       color: var(--muted);
-      font-size: 1.1rem;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 4px;
+      padding: 0.25rem 0.55rem;
       cursor: pointer;
-      padding: 0.15rem 0.4rem;
-      border-radius: 3px;
-      line-height: 1;
-      margin-left: 0.5rem;
-      transition: color 0.15s, background 0.15s;
+      line-height: 1.31;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
     }
-    .settings-btn:hover { color: var(--accent); background: var(--surface); }
+    .settings-btn:hover { color: var(--accent); border-color: var(--accent); }
 
     /* ── Settings overlay ── */
     #settings-overlay {
@@ -719,11 +719,13 @@
       <h1>Nota.ai</h1>
       <span>local &middot; on-device</span>
     </div>
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab('transcribe')">New</div>
-      <div class="tab" onclick="switchTab('archive')">Archive</div>
+    <div class="header-right">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('transcribe')">New</div>
+        <div class="tab" onclick="switchTab('archive')">Archive</div>
+      </div>
+      <button class="settings-btn" onclick="openSettings()" title="AI Provider Settings">⚙</button>
     </div>
-    <button class="settings-btn" onclick="openSettings()" title="AI Provider Settings">⚙</button>
   </header>
 
   <div id="archive-view">
