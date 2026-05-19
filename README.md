@@ -12,7 +12,9 @@ Handles any audio — meetings, phone calls, voice memos, interviews — without
 
 - **Transcription** via Whisper Large v3 Turbo — runs on the M-series GPU through Apple MLX
 - **Speaker diarization** via pyannote community-1 — separates and labels each speaker
-- **AI summaries** — one-click meeting summaries via LM Studio, Ollama, Gemini, Anthropic, or OpenAI
+- **AI summaries** — one-click meeting summaries via your choice of LLM:
+  - *Local:* LM Studio, Ollama
+  - *Cloud:* Anthropic, OpenAI, Gemini
 - **Live recording** — record directly from any audio input (mic, BlackHole, etc.)
 - **Archive** — all past transcriptions saved locally in SQLite, accessible anytime
 - **Speaker renaming** — rename Speaker 00 / Speaker 01 to real names; persists per transcript
