@@ -25,11 +25,13 @@ async def init_db() -> None:
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS settings (
-                id       INTEGER PRIMARY KEY CHECK (id = 1),
-                provider TEXT NOT NULL DEFAULT 'lmstudio',
-                base_url TEXT NOT NULL DEFAULT 'http://localhost:1234',
-                model    TEXT NOT NULL DEFAULT '',
-                api_key  TEXT NOT NULL DEFAULT ''
+                id            INTEGER PRIMARY KEY CHECK (id = 1),
+                provider      TEXT NOT NULL DEFAULT 'lmstudio',
+                base_url      TEXT NOT NULL DEFAULT 'http://localhost:1234',
+                model         TEXT NOT NULL DEFAULT '',
+                api_key       TEXT NOT NULL DEFAULT '',
+                prompt_style  TEXT NOT NULL DEFAULT 'meeting',
+                custom_prompt TEXT NOT NULL DEFAULT ''
             )
         """)
         try:
@@ -42,6 +44,14 @@ async def init_db() -> None:
             pass
         try:
             await db.execute("ALTER TABLE archive ADD COLUMN audio_ext TEXT")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE settings ADD COLUMN prompt_style TEXT NOT NULL DEFAULT 'meeting'")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE settings ADD COLUMN custom_prompt TEXT NOT NULL DEFAULT ''")
         except Exception:
             pass
         await db.commit()
@@ -107,18 +117,36 @@ async def update_filename(entry_id: str, filename: str) -> bool:
 async def get_settings() -> dict:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT provider, base_url, model, api_key FROM settings WHERE id = 1") as cur:
+        async with db.execute(
+            "SELECT provider, base_url, model, api_key, prompt_style, custom_prompt FROM settings WHERE id = 1"
+        ) as cur:
             row = await cur.fetchone()
     if row is None:
-        return {"provider": "lmstudio", "base_url": "http://localhost:1234", "model": "", "api_key": ""}
+        return {
+            "provider": "lmstudio",
+            "base_url": "http://localhost:1234",
+            "model": "",
+            "api_key": "",
+            "prompt_style": "meeting",
+            "custom_prompt": "",
+        }
     return dict(row)
 
 
-async def save_settings(provider: str, base_url: str, model: str, api_key: str) -> None:
+async def save_settings(
+    provider: str,
+    base_url: str,
+    model: str,
+    api_key: str,
+    prompt_style: str = "meeting",
+    custom_prompt: str = "",
+) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT OR REPLACE INTO settings (id, provider, base_url, model, api_key) VALUES (1, ?, ?, ?, ?)",
-            (provider, base_url, model, api_key),
+            """INSERT OR REPLACE INTO settings
+               (id, provider, base_url, model, api_key, prompt_style, custom_prompt)
+               VALUES (1, ?, ?, ?, ?, ?, ?)""",
+            (provider, base_url, model, api_key, prompt_style, custom_prompt),
         )
         await db.commit()
 

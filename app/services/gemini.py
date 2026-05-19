@@ -25,9 +25,7 @@ class GeminiService:
     def provider_name(self) -> str:
         return f"gemini/{self._model}"
 
-    async def stream_summarize(self, text: str) -> AsyncGenerator[str, None]:
-        from .factory import SUMMARIZATION_PROMPT
-        prompt = SUMMARIZATION_PROMPT.format(transcript=text)
+    async def stream_chat(self, prompt: str) -> AsyncGenerator[str, None]:
         try:
             async for chunk in self._client.aio.models.generate_content_stream(
                 model=self._model, contents=prompt

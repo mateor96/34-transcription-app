@@ -189,10 +189,12 @@ async def test_update_filename_missing_entry_returns_false(initialized_db):
 async def test_get_settings_defaults_when_table_empty(initialized_db):
     cfg = await get_settings()
     assert cfg == {
-        "provider": "lmstudio",
-        "base_url": "http://localhost:1234",
-        "model":    "",
-        "api_key":  "",
+        "provider":      "lmstudio",
+        "base_url":      "http://localhost:1234",
+        "model":         "",
+        "api_key":       "",
+        "prompt_style":  "meeting",
+        "custom_prompt": "",
     }
 
 

@@ -33,9 +33,7 @@ class LMStudioService:
     def provider_name(self) -> str:
         return f"lmstudio/{self.model}" if self.model else "lmstudio"
 
-    async def stream_summarize(self, text: str) -> AsyncGenerator[str, None]:
-        from .factory import SUMMARIZATION_PROMPT
-        prompt = SUMMARIZATION_PROMPT.format(transcript=text)
+    async def stream_chat(self, prompt: str) -> AsyncGenerator[str, None]:
         payload: dict = {
             "messages": [{"role": "user", "content": prompt}],
             "stream": True,

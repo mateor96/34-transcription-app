@@ -6,7 +6,10 @@ import pytest
 from app.services.anthropic_svc import AnthropicService
 from app.services.exceptions import ProviderAuthError
 from app.services.factory import (
+    COMBINE_PROMPT,
+    PROMPT_TEMPLATES,
     SUMMARIZATION_PROMPT,
+    build_summary_prompt,
     format_transcript,
     get_summarizer,
 )
@@ -79,6 +82,65 @@ def test_format_transcript_handles_missing_keys():
 
 def test_summarization_prompt_has_transcript_placeholder():
     assert "{transcript}" in SUMMARIZATION_PROMPT
+
+
+def test_prompt_templates_cover_all_styles():
+    assert set(PROMPT_TEMPLATES.keys()) >= {"meeting", "call", "interview", "lecture"}
+
+
+def test_all_prompt_templates_have_transcript_placeholder():
+    for name, tmpl in PROMPT_TEMPLATES.items():
+        assert "{transcript}" in tmpl, f"{name} prompt missing {{transcript}}"
+
+
+def test_combine_prompt_has_sections_placeholder():
+    assert "{sections}" in COMBINE_PROMPT
+
+
+def test_build_summary_prompt_meeting_style():
+    out = build_summary_prompt("meeting", "Hello world")
+    assert "Hello world" in out
+    assert "meeting assistant" in out.lower()
+
+
+def test_build_summary_prompt_call_style():
+    out = build_summary_prompt("call", "transcript text")
+    assert "phone call" in out.lower()
+
+
+def test_build_summary_prompt_interview_style():
+    out = build_summary_prompt("interview", "transcript text")
+    assert "interview" in out.lower()
+
+
+def test_build_summary_prompt_lecture_style():
+    out = build_summary_prompt("lecture", "transcript text")
+    assert "lecture" in out.lower() or "outline" in out.lower()
+
+
+def test_build_summary_prompt_unknown_style_falls_back_to_meeting():
+    out = build_summary_prompt("does-not-exist", "transcript text")
+    assert "meeting assistant" in out.lower()
+
+
+def test_build_summary_prompt_custom_with_placeholder():
+    custom = "Summarize this:\n{transcript}\n\nFinish."
+    out = build_summary_prompt("custom", "the words", custom_prompt=custom)
+    assert "Summarize this:" in out
+    assert "the words" in out
+    assert "Finish." in out
+
+
+def test_build_summary_prompt_custom_without_placeholder_appends_transcript():
+    custom = "Be brief."  # No {transcript} placeholder
+    out = build_summary_prompt("custom", "TRANSCRIPT_TEXT", custom_prompt=custom)
+    assert "Be brief." in out
+    assert "TRANSCRIPT_TEXT" in out
+
+
+def test_build_summary_prompt_custom_empty_falls_back_to_meeting():
+    out = build_summary_prompt("custom", "the words", custom_prompt="   ")
+    assert "meeting assistant" in out.lower()
 
 
 # ── get_summarizer ───────────────────────────────────────────────────────────

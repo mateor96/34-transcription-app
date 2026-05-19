@@ -61,10 +61,10 @@ def test_base_url_strips_trailing_slash():
     assert LMStudioService(base_url="http://host:1234/").base_url == "http://host:1234"
 
 
-# ── stream_summarize: happy path ─────────────────────────────────────────────
+# ── stream_chat: happy path ─────────────────────────────────────────────
 
 @respx.mock
-async def test_stream_summarize_yields_tokens():
+async def test_stream_chat_yields_tokens():
     sse = (
         b'data: {"choices":[{"delta":{"content":"Hello"}}]}\n'
         b'data: {"choices":[{"delta":{"content":" world"}}]}\n'
@@ -72,12 +72,12 @@ async def test_stream_summarize_yields_tokens():
     )
     respx.post(f"{URL}/v1/chat/completions").mock(return_value=httpx.Response(200, content=sse))
     svc = LMStudioService(base_url=URL)
-    tokens = [t async for t in svc.stream_summarize("hello")]
+    tokens = [t async for t in svc.stream_chat("hello")]
     assert tokens == ["Hello", " world"]
 
 
 @respx.mock
-async def test_stream_summarize_skips_done_marker():
+async def test_stream_chat_skips_done_marker():
     sse = (
         b'data: {"choices":[{"delta":{"content":"x"}}]}\n'
         b'data: [DONE]\n'
@@ -85,13 +85,13 @@ async def test_stream_summarize_skips_done_marker():
     )
     respx.post(f"{URL}/v1/chat/completions").mock(return_value=httpx.Response(200, content=sse))
     svc = LMStudioService(base_url=URL)
-    tokens = [t async for t in svc.stream_summarize("hello")]
+    tokens = [t async for t in svc.stream_chat("hello")]
     assert tokens == ["x"]
     assert "AFTER" not in tokens
 
 
 @respx.mock
-async def test_stream_summarize_ignores_malformed_chunks():
+async def test_stream_chat_ignores_malformed_chunks():
     sse = (
         b'data: not json\n'
         b'data: {"choices":[{"delta":{"content":"valid"}}]}\n'
@@ -100,12 +100,12 @@ async def test_stream_summarize_ignores_malformed_chunks():
     )
     respx.post(f"{URL}/v1/chat/completions").mock(return_value=httpx.Response(200, content=sse))
     svc = LMStudioService(base_url=URL)
-    tokens = [t async for t in svc.stream_summarize("hello")]
+    tokens = [t async for t in svc.stream_chat("hello")]
     assert tokens == ["valid"]
 
 
 @respx.mock
-async def test_stream_summarize_ignores_keepalive_and_blank_lines():
+async def test_stream_chat_ignores_keepalive_and_blank_lines():
     sse = (
         b'\n'
         b': keepalive\n'
@@ -114,19 +114,19 @@ async def test_stream_summarize_ignores_keepalive_and_blank_lines():
     )
     respx.post(f"{URL}/v1/chat/completions").mock(return_value=httpx.Response(200, content=sse))
     svc = LMStudioService(base_url=URL)
-    tokens = [t async for t in svc.stream_summarize("hello")]
+    tokens = [t async for t in svc.stream_chat("hello")]
     assert tokens == ["ok"]
 
 
-# ── stream_summarize: request payload ─────────────────────────────────────────
+# ── stream_chat: request payload ─────────────────────────────────────────
 
 @respx.mock
-async def test_stream_summarize_omits_model_field_when_unset():
+async def test_stream_chat_omits_model_field_when_unset():
     route = respx.post(f"{URL}/v1/chat/completions").mock(
         return_value=httpx.Response(200, content=b'data: [DONE]\n')
     )
     svc = LMStudioService(base_url=URL, model="")
-    [_ async for _ in svc.stream_summarize("hello")]
+    [_ async for _ in svc.stream_chat("hello")]
     body = route.calls.last.request.read()
     import json
     payload = json.loads(body)
@@ -135,12 +135,12 @@ async def test_stream_summarize_omits_model_field_when_unset():
 
 
 @respx.mock
-async def test_stream_summarize_passes_model_field_when_set():
+async def test_stream_chat_passes_model_field_when_set():
     route = respx.post(f"{URL}/v1/chat/completions").mock(
         return_value=httpx.Response(200, content=b'data: [DONE]\n')
     )
     svc = LMStudioService(base_url=URL, model="some-model")
-    [_ async for _ in svc.stream_summarize("hello")]
+    [_ async for _ in svc.stream_chat("hello")]
     body = route.calls.last.request.read()
     import json
     payload = json.loads(body)
@@ -148,20 +148,20 @@ async def test_stream_summarize_passes_model_field_when_set():
 
 
 @respx.mock
-async def test_stream_summarize_includes_transcript_in_prompt():
+async def test_stream_chat_includes_transcript_in_prompt():
     route = respx.post(f"{URL}/v1/chat/completions").mock(
         return_value=httpx.Response(200, content=b'data: [DONE]\n')
     )
     svc = LMStudioService(base_url=URL)
-    [_ async for _ in svc.stream_summarize("UNIQUE_TRANSCRIPT_MARKER")]
+    [_ async for _ in svc.stream_chat("UNIQUE_TRANSCRIPT_MARKER")]
     body = route.calls.last.request.read().decode()
     assert "UNIQUE_TRANSCRIPT_MARKER" in body
 
 
-# ── stream_summarize: error paths ─────────────────────────────────────────────
+# ── stream_chat: error paths ─────────────────────────────────────────────
 
 @respx.mock
-async def test_stream_summarize_400_surfaces_lmstudio_message():
+async def test_stream_chat_400_surfaces_lmstudio_message():
     respx.post(f"{URL}/v1/chat/completions").mock(
         return_value=httpx.Response(
             400,
@@ -170,43 +170,43 @@ async def test_stream_summarize_400_surfaces_lmstudio_message():
     )
     svc = LMStudioService(base_url=URL)
     with pytest.raises(ProviderModelError, match="Multiple models loaded"):
-        [_ async for _ in svc.stream_summarize("hello")]
+        [_ async for _ in svc.stream_chat("hello")]
 
 
 @respx.mock
-async def test_stream_summarize_404_raises_model_error():
+async def test_stream_chat_404_raises_model_error():
     respx.post(f"{URL}/v1/chat/completions").mock(
         return_value=httpx.Response(404, content=b'{"error": "model not found"}')
     )
     svc = LMStudioService(base_url=URL, model="missing")
     with pytest.raises(ProviderModelError, match="Model not found"):
-        [_ async for _ in svc.stream_summarize("hello")]
+        [_ async for _ in svc.stream_chat("hello")]
 
 
 @respx.mock
-async def test_stream_summarize_500_raises_model_error():
+async def test_stream_chat_500_raises_model_error():
     respx.post(f"{URL}/v1/chat/completions").mock(
         return_value=httpx.Response(500, content=b'{"error": "server crashed"}')
     )
     svc = LMStudioService(base_url=URL)
     with pytest.raises(ProviderModelError):
-        [_ async for _ in svc.stream_summarize("hello")]
+        [_ async for _ in svc.stream_chat("hello")]
 
 
 @respx.mock
-async def test_stream_summarize_connect_error_raises_unavailable():
+async def test_stream_chat_connect_error_raises_unavailable():
     respx.post(f"{URL}/v1/chat/completions").mock(side_effect=httpx.ConnectError("no route"))
     svc = LMStudioService(base_url=URL)
     with pytest.raises(ProviderUnavailableError, match="Cannot connect"):
-        [_ async for _ in svc.stream_summarize("hello")]
+        [_ async for _ in svc.stream_chat("hello")]
 
 
 @respx.mock
-async def test_stream_summarize_timeout_raises_unavailable():
+async def test_stream_chat_timeout_raises_unavailable():
     respx.post(f"{URL}/v1/chat/completions").mock(side_effect=httpx.ReadTimeout("slow"))
     svc = LMStudioService(base_url=URL)
     with pytest.raises(ProviderUnavailableError, match="timed out"):
-        [_ async for _ in svc.stream_summarize("hello")]
+        [_ async for _ in svc.stream_chat("hello")]
 
 
 # ── check_health ─────────────────────────────────────────────────────────────

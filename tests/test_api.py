@@ -304,6 +304,35 @@ class TestModels:
         assert "error" not in body
 
     @respx.mock
+    def test_lmstudio_filters_out_embedding_models(self, client):
+        respx.get("http://localhost:1234/v1/models").mock(
+            return_value=httpx.Response(200, json={
+                "data": [
+                    {"id": "qwen3-vl-30b"},
+                    {"id": "text-embedding-nomic-embed-text-v1.5"},
+                    {"id": "gemma-3-4b"},
+                ],
+            })
+        )
+        r = client.post("/models", json={"provider": "lmstudio", "base_url": "http://localhost:1234"})
+        models = r.json()["models"]
+        assert models == ["qwen3-vl-30b", "gemma-3-4b"]
+
+    @respx.mock
+    def test_ollama_filters_out_embedding_models(self, client):
+        respx.get("http://localhost:11434/api/tags").mock(
+            return_value=httpx.Response(200, json={
+                "models": [
+                    {"name": "llama3.2:3b"},
+                    {"name": "nomic-embed-text:latest"},
+                    {"name": "mxbai-embed-large"},
+                ],
+            })
+        )
+        r = client.post("/models", json={"provider": "ollama", "base_url": "http://localhost:11434"})
+        assert r.json()["models"] == ["llama3.2:3b"]
+
+    @respx.mock
     def test_lmstudio_unreachable_returns_error_message(self, client):
         respx.get("http://localhost:1234/v1/models").mock(side_effect=httpx.ConnectError("nope"))
         r = client.post("/models", json={"provider": "lmstudio", "base_url": "http://localhost:1234"})
@@ -335,17 +364,30 @@ class TestModels:
 # ── /summarize/{id} ──────────────────────────────────────────────────────────
 
 class FakeSummarizer:
-    def __init__(self, tokens=None, raises=None):
+    def __init__(self, tokens=None, raises=None, per_call_tokens=None):
+        """
+        Args:
+            tokens: tokens yielded on every call
+            raises: exception raised on call
+            per_call_tokens: list of token-lists; one list consumed per call
+        """
         self._tokens = tokens or []
         self._raises = raises
+        self._per_call = list(per_call_tokens) if per_call_tokens else None
+        self.prompts_seen: list[str] = []
 
     def provider_name(self) -> str:
         return "fake/test"
 
-    async def stream_summarize(self, text: str) -> AsyncGenerator[str, None]:
+    async def stream_chat(self, prompt: str) -> AsyncGenerator[str, None]:
+        self.prompts_seen.append(prompt)
         if self._raises is not None:
             raise self._raises
-        for t in self._tokens:
+        if self._per_call is not None:
+            batch = self._per_call.pop(0) if self._per_call else []
+        else:
+            batch = self._tokens
+        for t in batch:
             yield t
 
 
@@ -400,6 +442,123 @@ class TestSummarize:
         monkeypatch.setattr(main_module, "get_summarizer", raiser)
         r = client.get("/summarize/a")
         assert r.status_code == 400
+
+    async def test_summarize_uses_configured_prompt_style(self, client, monkeypatch):
+        await _insert_entry("a")
+        await db_module.save_settings("lmstudio", "http://localhost:1234", "", "", "call", "")
+        svc = FakeSummarizer(tokens=["ok"])
+        monkeypatch.setattr(main_module, "get_summarizer", lambda cfg: svc)
+        client.get("/summarize/a").text
+        assert "phone call" in svc.prompts_seen[0].lower()
+
+    async def test_summarize_uses_custom_prompt_when_style_is_custom(self, client, monkeypatch):
+        await _insert_entry("a")
+        await db_module.save_settings(
+            "lmstudio", "http://localhost:1234", "", "",
+            "custom", "Custom-style summary:\n{transcript}\nEnd.",
+        )
+        svc = FakeSummarizer(tokens=["x"])
+        monkeypatch.setattr(main_module, "get_summarizer", lambda cfg: svc)
+        client.get("/summarize/a").text
+        assert "Custom-style summary:" in svc.prompts_seen[0]
+        assert "End." in svc.prompts_seen[0]
+
+
+# ── /summarize chunking (map-reduce) ──────────────────────────────────────────
+
+class TestSummarizeChunking:
+    @pytest.fixture
+    def long_transcript_entry(self, monkeypatch):
+        """Force chunking by lowering the threshold."""
+        monkeypatch.setattr(main_module, "MAX_CHARS_PER_CHUNK", 200)
+
+    async def test_short_transcript_uses_single_pass(self, client, monkeypatch, long_transcript_entry):
+        # Insert an entry; SAMPLE_SEGMENTS formatted is short, well under 200 chars
+        await _insert_entry("a")
+        svc = FakeSummarizer(tokens=["one shot"])
+        monkeypatch.setattr(main_module, "get_summarizer", lambda cfg: svc)
+        r = client.get("/summarize/a")
+        events = list(_parse_sse(r.text))
+        # No stage events, just tokens + done
+        assert all(e["type"] in {"token", "done"} for e in events)
+        assert len(svc.prompts_seen) == 1
+
+    async def test_long_transcript_triggers_map_reduce(self, client, monkeypatch, long_transcript_entry):
+        # Build a transcript long enough to require multiple chunks
+        many_segments = [
+            {"speaker": f"SPEAKER_0{i % 2}", "start": i * 5.0, "end": (i + 1) * 5.0, "text": "filler " * 20}
+            for i in range(20)
+        ]
+        await db_module.save_transcription("a", "long.mp3", many_segments)
+
+        # Fake that distinguishes combine prompts (recognizable by "UNIFIED SUMMARY")
+        # from chunk prompts, so we can assert exactly which call streams to the user.
+        class _Fake:
+            def __init__(self): self.prompts_seen = []
+            def provider_name(self): return "fake/test"
+            async def stream_chat(self, prompt):
+                self.prompts_seen.append(prompt)
+                if "UNIFIED SUMMARY" in prompt:
+                    yield "FINAL"
+                else:
+                    yield "partial-content"
+
+        svc = _Fake()
+        monkeypatch.setattr(main_module, "get_summarizer", lambda cfg: svc)
+
+        r = client.get("/summarize/a")
+        events = list(_parse_sse(r.text))
+
+        stages = [e for e in events if e["type"] == "stage"]
+        assert len(stages) >= 2  # at least one section + combine
+        assert any("section" in s["message"].lower() for s in stages)
+        assert any("combin" in s["message"].lower() for s in stages)
+
+        tokens_emitted = [e["text"] for e in events if e["type"] == "token"]
+        # Only the final combine pass is streamed as tokens
+        assert tokens_emitted == ["FINAL"]
+
+        done = [e for e in events if e["type"] == "done"]
+        assert done and done[-1]["summary"] == "FINAL"
+
+    async def test_long_transcript_calls_chat_once_per_chunk_plus_combine(self, client, monkeypatch, long_transcript_entry):
+        many_segments = [
+            {"speaker": "SPEAKER_00", "start": i * 5.0, "end": (i + 1) * 5.0, "text": "filler " * 20}
+            for i in range(20)
+        ]
+        await db_module.save_transcription("a", "long.mp3", many_segments)
+
+        svc = FakeSummarizer(per_call_tokens=[["p"]] * 10)  # plenty
+        monkeypatch.setattr(main_module, "get_summarizer", lambda cfg: svc)
+        client.get("/summarize/a").text
+
+        # Last prompt is the combine prompt
+        assert "UNIFIED SUMMARY" in svc.prompts_seen[-1] or "Section" in svc.prompts_seen[-1]
+        # Multiple total calls (chunks + combine)
+        assert len(svc.prompts_seen) >= 3
+
+
+# ── /_chunk_transcript helper ────────────────────────────────────────────────
+
+class TestChunkTranscript:
+    def test_short_text_returns_one_chunk(self):
+        assert main_module._chunk_transcript("hi\nthere", max_chars=1000) == ["hi\nthere"]
+
+    def test_long_text_split_into_multiple_chunks(self):
+        text = "\n".join(["X" * 30 for _ in range(20)])
+        chunks = main_module._chunk_transcript(text, max_chars=100)
+        assert len(chunks) > 1
+        # No chunk exceeds the limit by more than one line
+        for c in chunks:
+            assert len(c) <= 130
+
+    def test_chunks_split_on_line_boundaries(self):
+        text = "alpha\nbeta\ngamma\ndelta"
+        chunks = main_module._chunk_transcript(text, max_chars=10)
+        # Every chunk is a whole set of lines; no line bisected
+        for c in chunks:
+            for line in c.split("\n"):
+                assert line in {"alpha", "beta", "gamma", "delta"}
 
 
 # ── /summary/{id} ─────────────────────────────────────────────────────────────

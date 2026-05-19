@@ -58,7 +58,7 @@ class TestAnthropic:
         svc = AnthropicService(api_key="sk-test", model="claude-opus-4-7")
         assert svc.provider_name() == "anthropic/claude-opus-4-7"
 
-    async def test_stream_summarize_yields_tokens(self):
+    async def test_stream_chat_yields_tokens(self):
         svc = AnthropicService(api_key="sk-test")
 
         # Fake stream context manager — `client.messages.stream(...)` returns
@@ -71,10 +71,10 @@ class TestAnthropic:
         svc._client = MagicMock()
         svc._client.messages.stream = MagicMock(return_value=stream_cm)
 
-        tokens = [t async for t in svc.stream_summarize("transcript")]
+        tokens = [t async for t in svc.stream_chat("transcript")]
         assert tokens == ["He", "llo"]
 
-    async def test_stream_summarize_maps_auth_error(self):
+    async def test_stream_chat_maps_auth_error(self):
         import anthropic
         svc = AnthropicService(api_key="sk-test")
         svc._client = MagicMock()
@@ -86,7 +86,7 @@ class TestAnthropic:
             )
         )
         with pytest.raises(ProviderAuthError):
-            [_ async for _ in svc.stream_summarize("hello")]
+            [_ async for _ in svc.stream_chat("hello")]
 
 
 # ── OpenAI ───────────────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ class TestOpenAI:
     def test_provider_name_includes_model(self):
         assert OpenAIService(api_key="sk-test", model="gpt-5").provider_name() == "openai/gpt-5"
 
-    async def test_stream_summarize_yields_tokens(self):
+    async def test_stream_chat_yields_tokens(self):
         svc = OpenAIService(api_key="sk-test")
         # The OpenAI SDK returns an async iterable of chunks; each chunk has
         # choices[0].delta.content
@@ -115,10 +115,10 @@ class TestOpenAI:
         svc._client.chat.completions.create = AsyncMock(
             return_value=_AsyncIter([chunk_a, chunk_empty, chunk_b])
         )
-        tokens = [t async for t in svc.stream_summarize("transcript")]
+        tokens = [t async for t in svc.stream_chat("transcript")]
         assert tokens == ["A", "B"]
 
-    async def test_stream_summarize_maps_auth_error(self):
+    async def test_stream_chat_maps_auth_error(self):
         import openai
         svc = OpenAIService(api_key="sk-test")
         svc._client = MagicMock()
@@ -130,7 +130,7 @@ class TestOpenAI:
             )
         )
         with pytest.raises(ProviderAuthError):
-            [_ async for _ in svc.stream_summarize("hello")]
+            [_ async for _ in svc.stream_chat("hello")]
 
 
 # ── Gemini ───────────────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ class TestGemini:
     def test_provider_name_includes_model(self):
         assert GeminiService(api_key="abc", model="gemini-2.5-pro").provider_name() == "gemini/gemini-2.5-pro"
 
-    async def test_stream_summarize_yields_text_chunks(self):
+    async def test_stream_chat_yields_text_chunks(self):
         svc = GeminiService(api_key="abc")
         chunk_a = SimpleNamespace(text="Hello")
         chunk_b = SimpleNamespace(text=" world")
@@ -159,10 +159,10 @@ class TestGemini:
         svc._client.aio.models.generate_content_stream = MagicMock(
             return_value=_AsyncIter([chunk_a, chunk_empty, chunk_b])
         )
-        tokens = [t async for t in svc.stream_summarize("transcript")]
+        tokens = [t async for t in svc.stream_chat("transcript")]
         assert tokens == ["Hello", " world"]
 
-    async def test_stream_summarize_maps_api_key_error(self):
+    async def test_stream_chat_maps_api_key_error(self):
         svc = GeminiService(api_key="abc")
         svc._client = MagicMock()
         svc._client.aio = MagicMock()
@@ -171,7 +171,7 @@ class TestGemini:
             side_effect=Exception("API_KEY invalid"),
         )
         with pytest.raises(ProviderAuthError):
-            [_ async for _ in svc.stream_summarize("hello")]
+            [_ async for _ in svc.stream_chat("hello")]
 
 
 # ── ImportError fallback (cloud SDK not installed) ────────────────────────────

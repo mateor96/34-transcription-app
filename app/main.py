@@ -22,7 +22,7 @@ from .db import (
 from .export import to_json, to_markdown, to_srt, to_txt
 from .pipeline import run_pipeline
 from .services.exceptions import ProviderAuthError, ProviderError, ProviderModelError, ProviderUnavailableError
-from .services.factory import format_transcript, get_summarizer
+from .services.factory import COMBINE_PROMPT, build_summary_prompt, format_transcript, get_summarizer
 
 
 @asynccontextmanager
@@ -182,22 +182,28 @@ def _format_response(segments: list, fmt: str):
 async def api_get_settings():
     cfg = await get_settings()
     return {
-        "provider": cfg["provider"],
-        "base_url": cfg["base_url"],
-        "model":    cfg["model"],
-        "api_key_set": bool(cfg["api_key"]),
+        "provider":      cfg["provider"],
+        "base_url":      cfg["base_url"],
+        "model":         cfg["model"],
+        "api_key_set":   bool(cfg["api_key"]),
+        "prompt_style":  cfg.get("prompt_style", "meeting"),
+        "custom_prompt": cfg.get("custom_prompt", ""),
     }
 
 
 @app.post("/settings")
 async def api_save_settings(body: dict):
-    allowed = {"provider", "base_url", "model", "api_key"}
+    allowed = {"provider", "base_url", "model", "api_key", "prompt_style", "custom_prompt"}
     b = {k: str(v) for k, v in body.items() if k in allowed}
+    # Preserve fields the client omitted so partial updates don't wipe other settings.
+    saved = await get_settings()
     await save_settings(
-        provider=b.get("provider", "lmstudio"),
-        base_url=b.get("base_url", ""),
-        model=b.get("model", ""),
-        api_key=b.get("api_key", ""),
+        provider=b.get("provider",      saved["provider"]),
+        base_url=b.get("base_url",      saved["base_url"]),
+        model=b.get("model",            saved["model"]),
+        api_key=b.get("api_key",        saved["api_key"]),
+        prompt_style=b.get("prompt_style", saved.get("prompt_style", "meeting")),
+        custom_prompt=b.get("custom_prompt", saved.get("custom_prompt", "")),
     )
     return {"ok": True}
 
@@ -222,6 +228,12 @@ async def api_test_provider(body: dict):
         return {"ok": False, "message": str(e)}
     except Exception as e:
         return {"ok": False, "message": str(e)}
+
+
+def _is_embedding_model(model_id: str) -> bool:
+    """Embedding-only models can't do chat completions; filter them out of the picker."""
+    lower = model_id.lower()
+    return "embed" in lower or "embedding" in lower
 
 
 _CLOUD_MODELS = {
@@ -266,7 +278,8 @@ async def list_models(body: dict):
                 resp = await client.get(f"{url}/v1/models")
                 resp.raise_for_status()
                 data = resp.json()
-                return {"models": [m["id"] for m in data.get("data", []) if "id" in m]}
+                ids = [m["id"] for m in data.get("data", []) if "id" in m]
+                return {"models": [m for m in ids if not _is_embedding_model(m)]}
         except Exception as e:
             return {"models": [], "error": f"Cannot reach LM Studio at {url}: {e}"}
 
@@ -277,7 +290,8 @@ async def list_models(body: dict):
                 resp = await client.get(f"{url}/api/tags")
                 resp.raise_for_status()
                 data = resp.json()
-                return {"models": [m["name"] for m in data.get("models", []) if "name" in m]}
+                names = [m["name"] for m in data.get("models", []) if "name" in m]
+                return {"models": [n for n in names if not _is_embedding_model(n)]}
         except Exception as e:
             return {"models": [], "error": f"Cannot reach Ollama at {url}: {e}"}
 
@@ -285,6 +299,33 @@ async def list_models(body: dict):
 
 
 # ── Summarize ─────────────────────────────────────────────────────────────────
+
+# Roughly: most local models comfortably handle ~30k characters per pass; cloud
+# models handle much more, but chunking keeps quality consistent and avoids
+# silent context-window failures on the small local side.
+MAX_CHARS_PER_CHUNK = 30_000
+
+
+def _chunk_transcript(text: str, max_chars: int) -> list[str]:
+    """Split on line boundaries so we never bisect a single speaker turn."""
+    if len(text) <= max_chars:
+        return [text]
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for line in text.split("\n"):
+        added = len(line) + 1
+        if current and current_len + added > max_chars:
+            chunks.append("\n".join(current))
+            current = [line]
+            current_len = added
+        else:
+            current.append(line)
+            current_len += added
+    if current:
+        chunks.append("\n".join(current))
+    return chunks
+
 
 @app.get("/summarize/{entry_id}")
 async def summarize_entry(entry_id: str):
@@ -301,14 +342,50 @@ async def summarize_entry(entry_id: str):
     except (ProviderAuthError, ProviderUnavailableError, ValueError) as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 
-    text = format_transcript(entry["segments"], entry.get("speaker_names") or {})
+    text          = format_transcript(entry["segments"], entry.get("speaker_names") or {})
+    style         = cfg.get("prompt_style") or "meeting"
+    custom_prompt = cfg.get("custom_prompt") or ""
+    chunks        = _chunk_transcript(text, MAX_CHARS_PER_CHUNK)
 
     async def stream():
         full: list[str] = []
         try:
-            async for token in svc.stream_summarize(text):
-                full.append(token)
-                yield {"data": json.dumps({"type": "token", "text": token})}
+            if len(chunks) == 1:
+                # Single-pass — stream the model output straight to the client.
+                prompt = build_summary_prompt(style, chunks[0], custom_prompt)
+                async for token in svc.stream_chat(prompt):
+                    full.append(token)
+                    yield {"data": json.dumps({"type": "token", "text": token})}
+            else:
+                # Map-reduce: summarize each chunk, then ask the model to merge
+                # the section summaries into one cohesive answer. Section work
+                # is reported as stage events so the user sees progress; only
+                # the final combine pass streams as tokens.
+                yield {"data": json.dumps({
+                    "type": "stage",
+                    "message": f"Long transcript — summarizing in {len(chunks)} sections…",
+                })}
+                partials: list[str] = []
+                for i, chunk in enumerate(chunks, 1):
+                    yield {"data": json.dumps({
+                        "type": "stage",
+                        "message": f"Section {i} of {len(chunks)}…",
+                    })}
+                    chunk_prompt = build_summary_prompt(style, chunk, custom_prompt)
+                    partial: list[str] = []
+                    async for token in svc.stream_chat(chunk_prompt):
+                        partial.append(token)
+                    partials.append("".join(partial))
+
+                yield {"data": json.dumps({"type": "stage", "message": "Combining sections…"})}
+                sections_block = "\n\n".join(
+                    f"Section {i+1}:\n{p}" for i, p in enumerate(partials)
+                )
+                combine_prompt = COMBINE_PROMPT.format(sections=sections_block)
+                async for token in svc.stream_chat(combine_prompt):
+                    full.append(token)
+                    yield {"data": json.dumps({"type": "token", "text": token})}
+
             summary = "".join(full)
             await save_summary(entry_id, summary)
             yield {"data": json.dumps({"type": "done", "summary": summary})}

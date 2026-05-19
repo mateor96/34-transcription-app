@@ -20,9 +20,7 @@ class OllamaService:
     def provider_name(self) -> str:
         return f"ollama/{self.model}"
 
-    async def stream_summarize(self, text: str) -> AsyncGenerator[str, None]:
-        from .factory import SUMMARIZATION_PROMPT
-        prompt = SUMMARIZATION_PROMPT.format(transcript=text)
+    async def stream_chat(self, prompt: str) -> AsyncGenerator[str, None]:
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],

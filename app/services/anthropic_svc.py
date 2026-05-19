@@ -25,10 +25,8 @@ class AnthropicService:
     def provider_name(self) -> str:
         return f"anthropic/{self._model}"
 
-    async def stream_summarize(self, text: str) -> AsyncGenerator[str, None]:
+    async def stream_chat(self, prompt: str) -> AsyncGenerator[str, None]:
         import anthropic
-        from .factory import SUMMARIZATION_PROMPT
-        prompt = SUMMARIZATION_PROMPT.format(transcript=text)
         try:
             async with self._client.messages.stream(
                 model=self._model,

@@ -25,10 +25,8 @@ class OpenAIService:
     def provider_name(self) -> str:
         return f"openai/{self._model}"
 
-    async def stream_summarize(self, text: str) -> AsyncGenerator[str, None]:
+    async def stream_chat(self, prompt: str) -> AsyncGenerator[str, None]:
         import openai
-        from .factory import SUMMARIZATION_PROMPT
-        prompt = SUMMARIZATION_PROMPT.format(transcript=text)
         try:
             stream = await self._client.chat.completions.create(
                 model=self._model,
