@@ -305,6 +305,9 @@
 
     async function deleteEntry(evt, id) {
       evt.stopPropagation();
+      const entry = evt.target.closest('.archive-entry');
+      const name  = entry?.querySelector('.entry-name')?.textContent?.trim() || 'this transcript';
+      if (!confirm(`Delete "${name}"?\n\nThe transcript, summary, and audio file will be permanently removed.`)) return;
       await fetch(`/archive/${id}`, { method: 'DELETE' });
       loadArchive();
     }
