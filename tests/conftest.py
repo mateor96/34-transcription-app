@@ -9,11 +9,44 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import keyring
+import keyring.backend
 import pytest
 
 from app import db as db_module
 from app import main as main_module
 from app import pipeline as pipeline_module
+
+
+class _MemoryKeyring(keyring.backend.KeyringBackend):
+    """In-memory keyring backend so tests never touch the real OS keychain."""
+
+    priority = 1
+
+    def __init__(self) -> None:
+        self._store: dict[tuple[str, str], str] = {}
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        self._store[(service, username)] = password
+
+    def get_password(self, service: str, username: str) -> str | None:
+        return self._store.get((service, username))
+
+    def delete_password(self, service: str, username: str) -> None:
+        if (service, username) not in self._store:
+            raise keyring.errors.PasswordDeleteError("not found")
+        del self._store[(service, username)]
+
+
+@pytest.fixture(autouse=True)
+def _isolated_keyring(monkeypatch: pytest.MonkeyPatch):
+    """Replace the keyring backend per-test so api_key state never leaks."""
+    backend = _MemoryKeyring()
+    monkeypatch.setattr(keyring, "get_keyring", lambda: backend)
+    monkeypatch.setattr(keyring, "set_password", backend.set_password)
+    monkeypatch.setattr(keyring, "get_password", backend.get_password)
+    monkeypatch.setattr(keyring, "delete_password", backend.delete_password)
+    yield
 
 
 @pytest.fixture

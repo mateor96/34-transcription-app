@@ -4,6 +4,8 @@ from pathlib import Path
 
 import aiosqlite
 
+from . import keychain
+
 DB_PATH   = Path.home() / ".transcribe" / "archive.db"
 AUDIO_DIR = Path.home() / ".transcribe" / "audio"
 
@@ -55,6 +57,15 @@ async def init_db() -> None:
         except Exception:
             pass
         await db.commit()
+
+        # One-time migration: move any legacy plaintext api_key out of SQLite
+        # into the OS keychain.
+        async with db.execute("SELECT api_key FROM settings WHERE id = 1") as cur:
+            row = await cur.fetchone()
+        if row and row[0]:
+            keychain.set_api_key(row[0])
+            await db.execute("UPDATE settings SET api_key = '' WHERE id = 1")
+            await db.commit()
 
 
 async def save_transcription(job_id: str, filename: str, segments: list, audio_ext: str | None = None) -> None:
@@ -118,7 +129,7 @@ async def get_settings() -> dict:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT provider, base_url, model, api_key, prompt_style, custom_prompt FROM settings WHERE id = 1"
+            "SELECT provider, base_url, model, prompt_style, custom_prompt FROM settings WHERE id = 1"
         ) as cur:
             row = await cur.fetchone()
     if row is None:
@@ -126,11 +137,13 @@ async def get_settings() -> dict:
             "provider": "lmstudio",
             "base_url": "http://localhost:1234",
             "model": "",
-            "api_key": "",
+            "api_key": keychain.get_api_key(),
             "prompt_style": "meeting",
             "custom_prompt": "",
         }
-    return dict(row)
+    cfg = dict(row)
+    cfg["api_key"] = keychain.get_api_key()
+    return cfg
 
 
 async def save_settings(
@@ -141,12 +154,13 @@ async def save_settings(
     prompt_style: str = "meeting",
     custom_prompt: str = "",
 ) -> None:
+    keychain.set_api_key(api_key)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """INSERT OR REPLACE INTO settings
                (id, provider, base_url, model, api_key, prompt_style, custom_prompt)
-               VALUES (1, ?, ?, ?, ?, ?, ?)""",
-            (provider, base_url, model, api_key, prompt_style, custom_prompt),
+               VALUES (1, ?, ?, ?, '', ?, ?)""",
+            (provider, base_url, model, prompt_style, custom_prompt),
         )
         await db.commit()
 

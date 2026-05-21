@@ -103,7 +103,7 @@ uv add openai        # GPT
 uv add google-genai  # Gemini
 ```
 
-API keys are stored locally in SQLite (`~/.transcribe/archive.db`). Audio and transcripts never leave your machine unless you point Nota.ai at a cloud LLM — and even then, only the transcript text is sent.
+API keys are stored in the macOS Keychain (service: `nota.ai`). Audio and transcripts never leave your machine unless you point Nota.ai at a cloud LLM — and even then, only the transcript text is sent.
 
 ---
 
