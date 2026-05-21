@@ -3,7 +3,9 @@
     const transcribeBtn = document.getElementById('transcribe-btn');
     const progressSec   = document.getElementById('progress-section');
     const progressFill  = document.getElementById('progress-fill');
-    const stageText     = document.getElementById('stage-text');
+    const stageVerbEl   = document.getElementById('stage-verb');
+    const stageDetailEl = document.getElementById('stage-detail');
+    const stagePctEl    = document.getElementById('stage-pct');
     const resultSec     = document.getElementById('result-section');
     const audioPlayer   = document.getElementById('audio-player');
     const transcriptEl  = document.getElementById('transcript');
@@ -64,18 +66,58 @@
       listenProgress(job_id);
     });
 
-    function setProgress(pct, message) {
+    // Whimsical verbs cycled while we wait — pure cosmetics, like Claude Code.
+    const STAGE_VERBS = [
+      'Tinkering', 'Pondering', 'Listening', 'Decoding', 'Transcribing',
+      'Synthesizing', 'Conjuring', 'Untangling', 'Noodling', 'Computing',
+      'Distilling', 'Aligning', 'Cogitating', 'Whittling', 'Brewing',
+    ];
+    let _verbTimer = null;
+    let _verbIdx   = 0;
+
+    function startVerbCycle() {
+      stopVerbCycle();
+      _verbIdx = Math.floor(Math.random() * STAGE_VERBS.length);
+      stageVerbEl.textContent = STAGE_VERBS[_verbIdx] + '…';
+      _verbTimer = setInterval(() => {
+        _verbIdx = (_verbIdx + 1) % STAGE_VERBS.length;
+        stageVerbEl.classList.add('is-fading');
+        setTimeout(() => {
+          stageVerbEl.textContent = STAGE_VERBS[_verbIdx] + '…';
+          stageVerbEl.classList.remove('is-fading');
+        }, 250);
+      }, 2200);
+    }
+
+    function stopVerbCycle() {
+      if (_verbTimer) { clearInterval(_verbTimer); _verbTimer = null; }
+      stageVerbEl.classList.remove('is-fading');
+    }
+
+    function setProgress(pct, detail) {
       progressFill.style.width = pct + '%';
-      stageText.textContent    = message;
+      stageDetailEl.textContent = detail || '';
+      stagePctEl.textContent    = pct != null ? `${Math.round(pct)}%` : '';
     }
 
     function listenProgress(jobId) {
+      startVerbCycle();
       const es = new EventSource(`/progress/${jobId}`);
       es.onmessage = e => {
         const data = JSON.parse(e.data);
         setProgress(data.pct ?? 0, data.message ?? data.stage);
-        if (data.stage === 'done')  { es.close(); loadLiveResult(jobId); }
-        if (data.stage === 'error') { es.close(); stageText.textContent = 'Error: ' + data.message; }
+        if (data.stage === 'done')  {
+          es.close();
+          stopVerbCycle();
+          stageVerbEl.textContent = 'Done';
+          loadLiveResult(jobId);
+        }
+        if (data.stage === 'error') {
+          es.close();
+          stopVerbCycle();
+          stageVerbEl.textContent = 'Error';
+          stageDetailEl.textContent = data.message;
+        }
       };
     }
 

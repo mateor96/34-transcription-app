@@ -360,11 +360,44 @@
       transition: width 0.5s ease;
       width: 0%;
     }
-    #stage-text {
+    .stage-row {
       margin-top: 0.6rem;
       font-size: 0.8rem;
       color: var(--muted);
       letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .stage-spinner {
+      width: 0.7rem;
+      height: 0.7rem;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      border-top-color: var(--accent);
+      display: inline-block;
+      animation: stage-spin 0.9s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes stage-spin {
+      to { transform: rotate(360deg); }
+    }
+    .stage-verb {
+      color: var(--text, #111);
+      font-weight: 500;
+      transition: opacity 0.25s ease;
+      min-width: 6.5rem;
+      display: inline-block;
+    }
+    .stage-verb.is-fading { opacity: 0; }
+    .stage-detail { color: var(--muted); }
+    .stage-detail::before { content: "·"; margin-right: 0.5rem; }
+    .stage-detail:empty::before { content: ""; }
+    .stage-pct {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 0.75rem;
     }
 
     /* ── Result ── */

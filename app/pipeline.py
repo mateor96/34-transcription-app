@@ -46,17 +46,32 @@ async def run_pipeline(
 
         await emit({"stage": "processing", "pct": 10, "message": "Starting transcription and diarization..."})
 
-        transcribe_future = loop.run_in_executor(_executor, transcribe, wav_path)
+        # Whisper writes its 0..1 progress here from a worker thread; the poll
+        # loop below reads it and forwards real progress to the SSE stream.
+        job["whisper_progress"] = 0.0
+        def _on_whisper_progress(frac: float) -> None:
+            job["whisper_progress"] = frac
+
+        transcribe_future = loop.run_in_executor(
+            _executor, transcribe, wav_path, _on_whisper_progress,
+        )
         diarize_future = loop.run_in_executor(_executor, diarize, wav_path, min_speakers, max_speakers)
 
-        # Emit progress every 8 s while both ML tasks run
-        pct = 10
+        # Poll often enough that the bar feels live without flooding the SSE stream.
         pending = {transcribe_future, diarize_future}
+        last_pct = 10
         while pending:
-            done, pending = await asyncio.wait(pending, timeout=8)
-            if pending:
-                pct = min(pct + 12, 80)
-                await emit({"stage": "processing", "pct": pct, "message": "Processing..."})
+            done, pending = await asyncio.wait(pending, timeout=1.5)
+            if not pending:
+                break
+            whisper_done = transcribe_future not in pending
+            # 10..80% reserved for transcription; jump to 80 once it's done and
+            # only diarization remains.
+            pct = 80 if whisper_done else 10 + int(job["whisper_progress"] * 70)
+            message = "Identifying speakers..." if whisper_done else "Transcribing..."
+            if pct != last_pct:
+                await emit({"stage": "processing", "pct": pct, "message": message})
+                last_pct = pct
 
         whisper_result = await transcribe_future
         diarization_turns = await diarize_future
