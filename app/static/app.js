@@ -303,30 +303,50 @@
     // ── Archive ───────────────────────────────────────────────────────────────
 
     async function loadArchive() {
-      const entries = await fetch('/archive').then(r => r.json());
+      const q = (document.getElementById('archive-search')?.value || '').trim();
+      const url = q ? `/archive/search?q=${encodeURIComponent(q)}` : '/archive';
+      const entries = await fetch(url).then(r => r.json());
       const el = document.getElementById('archive-list');
       if (!entries.length) {
-        el.innerHTML = '<div class="archive-empty">No transcriptions yet.</div>';
+        el.innerHTML = `<div class="archive-empty">${q ? 'No matches.' : 'No transcriptions yet.'}</div>`;
         return;
       }
-      el.innerHTML = entries.map(e => {
-        const date = new Date(e.created_at).toLocaleDateString('de-DE', { day:'2-digit', month:'short', year:'numeric' });
-        const dur     = fmtDuration(e.duration_s);
-        const spk     = e.speaker_count === 1 ? '1 speaker' : `${e.speaker_count} speakers`;
-        const sumBadge = e.has_summary ? ' &middot; <span style="color:var(--accent)">✦</span>' : '';
-        return `<div class="archive-entry" onclick="loadArchiveEntry('${e.id}')">
-          <div style="min-width:0">
-            <div class="entry-name">${escapeHtml(e.filename)}</div>
-            <div class="entry-meta">${dur} &middot; ${spk}${sumBadge}</div>
-          </div>
-          <div class="entry-right">
-            <div class="entry-date">${date}</div>
-            <button class="entry-rename-btn" title="Rename" onclick="startArchiveRename(event,'${e.id}',this)"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5a1.414 1.414 0 0 1 2 2L3.5 10.5 1 11l.5-2.5 7-7z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            <button class="entry-delete" title="Delete" onclick="deleteEntry(event,'${e.id}')">✕</button>
-          </div>
-        </div>`;
-      }).join('');
+      el.innerHTML = entries.map(e => renderArchiveEntry(e)).join('');
     }
+
+    function renderArchiveEntry(e) {
+      const date = new Date(e.created_at).toLocaleDateString('de-DE', { day:'2-digit', month:'short', year:'numeric' });
+      const dur     = fmtDuration(e.duration_s);
+      const spk     = e.speaker_count === 1 ? '1 speaker' : `${e.speaker_count} speakers`;
+      const sumBadge = e.has_summary ? ' &middot; <span style="color:var(--accent)">✦</span>' : '';
+      // snippet from FTS is pre-sanitized server-side except for the <mark> tags we asked for.
+      const snippet = e.snippet ? `<div class="entry-snippet">${sanitizeSnippet(e.snippet)}</div>` : '';
+      return `<div class="archive-entry" onclick="loadArchiveEntry('${e.id}')">
+        <div style="min-width:0">
+          <div class="entry-name">${escapeHtml(e.filename)}</div>
+          <div class="entry-meta">${dur} &middot; ${spk}${sumBadge}</div>
+          ${snippet}
+        </div>
+        <div class="entry-right">
+          <div class="entry-date">${date}</div>
+          <button class="entry-rename-btn" title="Rename" onclick="startArchiveRename(event,'${e.id}',this)"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5a1.414 1.414 0 0 1 2 2L3.5 10.5 1 11l.5-2.5 7-7z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="entry-delete" title="Delete" onclick="deleteEntry(event,'${e.id}')">✕</button>
+        </div>
+      </div>`;
+    }
+
+    // Escape the snippet but preserve the <mark>...</mark> spans FTS5 inserts.
+    function sanitizeSnippet(s) {
+      return escapeHtml(s)
+        .replaceAll('&lt;mark&gt;', '<mark>')
+        .replaceAll('&lt;/mark&gt;', '</mark>');
+    }
+
+    let _searchDebounce = null;
+    document.getElementById('archive-search')?.addEventListener('input', () => {
+      clearTimeout(_searchDebounce);
+      _searchDebounce = setTimeout(loadArchive, 180);
+    });
 
     async function loadArchiveEntry(id) {
       const entry  = await fetch(`/archive/${id}`).then(r => r.json());

@@ -16,6 +16,7 @@ from app.db import (
     save_settings,
     save_summary,
     save_transcription,
+    search_archive,
     update_filename,
     update_speaker_names,
 )
@@ -281,3 +282,88 @@ async def test_delete_archive_entry_audio_missing_on_disk_does_not_fail(initiali
 
 async def test_delete_archive_entry_missing_returns_false(initialized_db):
     assert await delete_archive_entry("nope") is False
+
+
+# ── search_archive (FTS5) ────────────────────────────────────────────────────
+
+async def test_search_finds_word_in_transcript(initialized_db):
+    await save_transcription("a", "standup.mp3", [
+        {"speaker": "S0", "start": 0, "end": 1, "text": "Quarterly numbers look strong."},
+    ])
+    await save_transcription("b", "1on1.mp3", [
+        {"speaker": "S0", "start": 0, "end": 1, "text": "Talking about the roadmap today."},
+    ])
+    hits = await search_archive("quarterly")
+    assert [h["id"] for h in hits] == ["a"]
+    assert "<mark>" in hits[0]["snippet"]
+
+
+async def test_search_matches_filename(initialized_db):
+    await save_transcription("a", "weekly-standup.mp3", SAMPLE_SEGMENTS)
+    hits = await search_archive("standup")
+    assert [h["id"] for h in hits] == ["a"]
+
+
+async def test_search_is_prefix_and_and(initialized_db):
+    await save_transcription("a", "a.mp3", [
+        {"speaker": "S0", "start": 0, "end": 1, "text": "Hiring decisions for the team."},
+    ])
+    await save_transcription("b", "b.mp3", [
+        {"speaker": "S0", "start": 0, "end": 1, "text": "Hiring is paused."},
+    ])
+    # 'hir dec' must match a (both tokens, prefix), not b (no 'dec' prefix).
+    hits = await search_archive("hir dec")
+    assert [h["id"] for h in hits] == ["a"]
+
+
+async def test_search_empty_or_punctuation_only_returns_nothing(initialized_db):
+    await save_transcription("a", "a.mp3", SAMPLE_SEGMENTS)
+    assert await search_archive("") == []
+    assert await search_archive("   ") == []
+    assert await search_archive("!!!") == []
+
+
+async def test_search_ignores_fts_operators_safely(initialized_db):
+    """User typing FTS5-meaningful chars (quotes, AND, parens) must not error."""
+    await save_transcription("a", "a.mp3", [
+        {"speaker": "S0", "start": 0, "end": 1, "text": "Hello world."},
+    ])
+    hits = await search_archive('"hello" AND (world)')
+    assert [h["id"] for h in hits] == ["a"]
+
+
+async def test_search_reflects_renames(initialized_db):
+    await save_transcription("a", "old.mp3", SAMPLE_SEGMENTS)
+    assert await search_archive("freshname") == []
+    await update_filename("a", "freshname.mp3")
+    hits = await search_archive("freshname")
+    assert [h["id"] for h in hits] == ["a"]
+
+
+async def test_search_drops_deleted_entries(initialized_db):
+    await save_transcription("a", "a.mp3", [
+        {"speaker": "S0", "start": 0, "end": 1, "text": "Doomed transcript."},
+    ])
+    await delete_archive_entry("a")
+    assert await search_archive("doomed") == []
+
+
+async def test_init_db_backfills_existing_rows_into_fts(storage: Path):
+    """Pre-existing rows (created before FTS index existed) get indexed on startup."""
+    await init_db()
+    # Insert a row directly bypassing save_transcription (simulating a legacy row),
+    # then wipe FTS to mimic a fresh upgrade.
+    import json as _json
+    async with aiosqlite.connect(db_module.DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO archive (id, filename, created_at, duration_s, speaker_count, "
+            "result_json, speaker_names) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("legacy", "legacy.mp3", "2026-01-01", 1.0, 1,
+             _json.dumps([{"speaker": "S0", "start": 0, "end": 1, "text": "ancient meeting notes"}]), "{}"),
+        )
+        await db.execute("DELETE FROM archive_fts WHERE id = 'legacy'")
+        await db.commit()
+    # Re-run init_db — backfill should re-index the orphan.
+    await init_db()
+    hits = await search_archive("ancient")
+    assert [h["id"] for h in hits] == ["legacy"]

@@ -17,7 +17,8 @@ from sse_starlette.sse import EventSourceResponse
 
 from .db import (
     AUDIO_DIR, delete_archive_entry, get_archive_entry, get_settings, init_db,
-    list_archive, save_settings, save_summary, update_filename, update_speaker_names,
+    list_archive, save_settings, save_summary, search_archive, update_filename,
+    update_speaker_names,
 )
 from .export import to_json, to_markdown, to_srt, to_txt
 from .pipeline import run_pipeline
@@ -91,6 +92,11 @@ async def get_result(job_id: str, fmt: str):
 @app.get("/archive")
 async def archive_list():
     return await list_archive()
+
+
+@app.get("/archive/search")
+async def archive_search(q: str = Query(default="")):
+    return await search_archive(q)
 
 
 @app.get("/archive/{entry_id}")

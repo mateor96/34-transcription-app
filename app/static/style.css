@@ -75,6 +75,37 @@
     #archive-view { display: none; }
     .archive-empty { font-size: 0.88rem; color: var(--muted); padding: 2rem 0; text-align: center; }
     .archive-list { border-top: 1.5px solid var(--border); }
+    .archive-search {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.55rem 0.75rem;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .archive-search:focus { border-color: var(--accent); }
+    .archive-search::-webkit-search-cancel-button { cursor: pointer; }
+    .entry-snippet {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+      line-height: 1.45;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .entry-snippet mark {
+      background: var(--accent);
+      color: var(--bg);
+      padding: 0 2px;
+      border-radius: 2px;
+    }
     .archive-entry {
       display: grid;
       grid-template-columns: 1fr auto;
