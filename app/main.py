@@ -411,5 +411,7 @@ async def get_entry_summary(entry_id: str):
     return {"summary": entry.get("summary")}
 
 
-# Static files last so they don't shadow the API routes
-app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
+# Static files last so they don't shadow the API routes.
+# Resolve relative to this file so uvicorn works no matter where it's launched from.
+_STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")

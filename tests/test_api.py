@@ -588,3 +588,36 @@ class TestLifespan:
         If that fails, the test client setup itself would error."""
         r = client.get("/archive")
         assert r.status_code == 200
+
+
+# ── Static file mount ────────────────────────────────────────────────────────
+
+class TestStaticFiles:
+    """The frontend must serve regardless of where uvicorn was launched from.
+
+    pytest runs from the project root, so a hardcoded `app/static` happens to
+    work there. To catch the real bug we chdir into a tmp directory first —
+    that simulates `cd /tmp && uvicorn app.main:app`.
+    """
+
+    def test_index_served_from_unrelated_cwd(self, storage, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        from fastapi.testclient import TestClient
+        from app import main as main_module
+
+        with TestClient(main_module.app) as c:
+            r = c.get("/")
+
+        assert r.status_code == 200, "index.html should serve regardless of cwd"
+        assert "<title>Nota.ai</title>" in r.text
+
+    def test_app_js_served_from_unrelated_cwd(self, storage, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        from fastapi.testclient import TestClient
+        from app import main as main_module
+
+        with TestClient(main_module.app) as c:
+            r = c.get("/app.js")
+
+        assert r.status_code == 200
+        assert "EventSource" in r.text  # sanity-check it's actually the real app.js
