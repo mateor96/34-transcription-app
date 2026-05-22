@@ -3,8 +3,8 @@
     const transcribeBtn = document.getElementById('transcribe-btn');
     const progressSec   = document.getElementById('progress-section');
     const progressFill  = document.getElementById('progress-fill');
-    const stageVerbEl   = document.getElementById('stage-verb');
-    const stageDetailEl = document.getElementById('stage-detail');
+    const stageSpinEl   = document.getElementById('stage-spinner');
+    const stageLabelEl  = document.getElementById('stage-label');
     const stagePctEl    = document.getElementById('stage-pct');
     const resultSec     = document.getElementById('result-section');
     const audioPlayer   = document.getElementById('audio-player');
@@ -66,57 +66,66 @@
       listenProgress(job_id);
     });
 
-    // Whimsical verbs cycled while we wait — pure cosmetics, like Claude Code.
-    const STAGE_VERBS = [
-      'Tinkering', 'Pondering', 'Listening', 'Decoding', 'Transcribing',
-      'Synthesizing', 'Conjuring', 'Untangling', 'Noodling', 'Computing',
-      'Distilling', 'Aligning', 'Cogitating', 'Whittling', 'Brewing',
+    // Rotated every 3s while the server reports "Transcribing..." so the long
+    // wait has something to look at. Phrases are all honest descriptions of
+    // what Whisper is actually doing.
+    const TRANSCRIBE_PHRASES = [
+      'Transcribing…',
+      'Listening to audio…',
+      'Decoding speech…',
+      'Aligning word timestamps…',
+      'Processing audio frames…',
+      'Refining segments…',
     ];
-    let _verbTimer = null;
-    let _verbIdx   = 0;
+    let _cycleTimer = null;
+    let _cycleIdx   = 0;
 
-    function startVerbCycle() {
-      stopVerbCycle();
-      _verbIdx = Math.floor(Math.random() * STAGE_VERBS.length);
-      stageVerbEl.textContent = STAGE_VERBS[_verbIdx] + '…';
-      _verbTimer = setInterval(() => {
-        _verbIdx = (_verbIdx + 1) % STAGE_VERBS.length;
-        stageVerbEl.classList.add('is-fading');
-        setTimeout(() => {
-          stageVerbEl.textContent = STAGE_VERBS[_verbIdx] + '…';
-          stageVerbEl.classList.remove('is-fading');
-        }, 250);
-      }, 2200);
+    function startTranscribeCycle() {
+      if (_cycleTimer) return;
+      _cycleIdx = 0;
+      stageLabelEl.textContent = TRANSCRIBE_PHRASES[0];
+      _cycleTimer = setInterval(() => {
+        _cycleIdx = (_cycleIdx + 1) % TRANSCRIBE_PHRASES.length;
+        stageLabelEl.textContent = TRANSCRIBE_PHRASES[_cycleIdx];
+      }, 5000);
     }
 
-    function stopVerbCycle() {
-      if (_verbTimer) { clearInterval(_verbTimer); _verbTimer = null; }
-      stageVerbEl.classList.remove('is-fading');
+    function stopCycle() {
+      if (_cycleTimer) { clearInterval(_cycleTimer); _cycleTimer = null; }
     }
 
-    function setProgress(pct, detail) {
+    function setProgress(pct, label) {
       progressFill.style.width = pct + '%';
-      stageDetailEl.textContent = detail || '';
-      stagePctEl.textContent    = pct != null ? `${Math.round(pct)}%` : '';
+      if (label) {
+        if (label.startsWith('Transcribing')) {
+          startTranscribeCycle();
+        } else {
+          stopCycle();
+          stageLabelEl.textContent = label;
+        }
+      }
+      stagePctEl.textContent = pct != null ? `${Math.round(pct)}%` : '';
     }
 
     function listenProgress(jobId) {
-      startVerbCycle();
+      stopCycle();
+      stageSpinEl.classList.remove('is-hidden');
       const es = new EventSource(`/progress/${jobId}`);
       es.onmessage = e => {
         const data = JSON.parse(e.data);
-        setProgress(data.pct ?? 0, data.message ?? data.stage);
-        if (data.stage === 'done')  {
+        setProgress(data.pct ?? 0, data.message);
+        if (data.stage === 'done') {
           es.close();
-          stopVerbCycle();
-          stageVerbEl.textContent = 'Done';
+          stopCycle();
+          stageSpinEl.classList.add('is-hidden');
+          stageLabelEl.textContent = 'Done';
           loadLiveResult(jobId);
         }
         if (data.stage === 'error') {
           es.close();
-          stopVerbCycle();
-          stageVerbEl.textContent = 'Error';
-          stageDetailEl.textContent = data.message;
+          stopCycle();
+          stageSpinEl.classList.add('is-hidden');
+          stageLabelEl.textContent = `Error: ${data.message}`;
         }
       };
     }

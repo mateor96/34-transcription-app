@@ -7,11 +7,17 @@ fraction.
 """
 from __future__ import annotations
 
+import sys
 import threading
 from typing import Callable, Optional
 
 import mlx_whisper
-import mlx_whisper.transcribe as _mw_transcribe
+import mlx_whisper.transcribe  # noqa: F401 — ensures the submodule is in sys.modules
+
+# `mlx_whisper.__init__` does `from .transcribe import transcribe`, which
+# shadows the submodule name on the package. Reach into sys.modules to get
+# the actual module object so we can patch its `tqdm` binding.
+_mw_transcribe = sys.modules["mlx_whisper.transcribe"]
 
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 
