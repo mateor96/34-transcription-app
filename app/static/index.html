@@ -125,6 +125,23 @@
     <div id="transcript"></div>
   </section>
 
+  <div id="shortcuts-overlay" style="display:none" onclick="if(event.target===this)closeShortcutsOverlay()">
+    <div class="shortcuts-panel">
+      <div class="shortcuts-header">
+        <span>Keyboard shortcuts</span>
+        <button class="settings-close" onclick="closeShortcutsOverlay()">✕</button>
+      </div>
+      <table class="shortcuts-table">
+        <tr><td><kbd>Space</kbd> / <kbd>K</kbd></td><td>Play / pause</td></tr>
+        <tr><td><kbd>J</kbd> / <kbd>L</kbd></td><td>Rewind / forward 5 s</td></tr>
+        <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Rewind / forward 2 s</td></tr>
+        <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Previous / next segment</td></tr>
+        <tr><td><kbd>?</kbd></td><td>Toggle this overlay</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Close overlays</td></tr>
+      </table>
+    </div>
+  </div>
+
   <div id="settings-overlay" style="display:none" onclick="closeSettingsIfOutside(event)">
     <div class="settings-panel">
       <div class="settings-panel-header">

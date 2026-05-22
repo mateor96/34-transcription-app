@@ -193,6 +193,19 @@
       });
     }
 
+    // Flat, time-sorted index of every word span on screen. Built once per
+    // render and consulted by an rAF loop with a binary search so karaoke
+    // highlighting stays cheap on long transcripts (~6k words).
+    let _wordIndex = [];
+    let _activeWordIdx = -1;
+    let _rafId = null;
+    let _segmentStarts = [];  // for ↑/↓ segment-hop
+
+    // Highlight slightly *before* the word's actual start so the visual feels
+    // in sync with what the ear hears (compensates for paint lag + human
+    // reaction time). Karaoke apps universally do some version of this.
+    const HIGHLIGHT_LEAD_MS = 80;
+
     function renderTranscript(segments) {
       transcriptEl.innerHTML = segments.map(seg => {
         const mins = Math.floor(seg.start / 60).toString().padStart(2, '0');
@@ -202,17 +215,122 @@
             <div class="turn-speaker">${displayName(seg.speaker)}</div>
             <div class="turn-time">${mins}:${secs}</div>
           </div>
-          <div class="turn-text">${escapeHtml(seg.text)}</div>
+          <div class="turn-text">${renderTurnText(seg)}</div>
         </div>`;
       }).join('');
 
-      transcriptEl.querySelectorAll('.turn').forEach(el => {
+      // Segment-level click (on the meta column) still seeks to segment start.
+      transcriptEl.querySelectorAll('.turn-meta').forEach(el => {
+        el.addEventListener('click', () => {
+          const start = parseFloat(el.parentElement.dataset.start);
+          audioPlayer.currentTime = start;
+          audioPlayer.play();
+        });
+      });
+      // Word-level click seeks to that word.
+      transcriptEl.querySelectorAll('.w').forEach(el => {
         el.addEventListener('click', () => {
           audioPlayer.currentTime = parseFloat(el.dataset.start);
           audioPlayer.play();
         });
       });
+
+      rebuildWordIndex();
+      _segmentStarts = segments.map(s => s.start);
     }
+
+    function renderTurnText(seg) {
+      // Legacy entries (or any segment without word timestamps) fall back to
+      // the plain text — no karaoke, but the rest of the UI still works.
+      if (!seg.words || !seg.words.length) return escapeHtml(seg.text);
+      return seg.words.map(w =>
+        `<span class="w" data-start="${w.start}" data-end="${w.end}">${escapeHtml(w.word)}</span>`
+      ).join('');
+    }
+
+    function rebuildWordIndex() {
+      const els = transcriptEl.querySelectorAll('.w');
+      _wordIndex = new Array(els.length);
+      for (let i = 0; i < els.length; i++) {
+        _wordIndex[i] = {
+          start: parseFloat(els[i].dataset.start),
+          end:   parseFloat(els[i].dataset.end),
+          el:    els[i],
+        };
+      }
+      _activeWordIdx = -1;
+    }
+
+    function findWordIdx(t) {
+      // Largest i where _wordIndex[i].start <= t. Returns -1 if t is before
+      // the first word.
+      let lo = 0, hi = _wordIndex.length - 1, best = -1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (_wordIndex[mid].start <= t) { best = mid; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      return best;
+    }
+
+    // Don't auto-scroll the active word into view if the user is reading
+    // somewhere else — yanking the page back is one of the worst sins of
+    // synced-text players.
+    let _lastUserScrollAt = 0;
+    document.addEventListener('scroll', () => { _lastUserScrollAt = Date.now(); }, { passive: true });
+
+    function syncKaraoke() {
+      if (!_wordIndex.length) return;
+      const t = audioPlayer.currentTime + HIGHLIGHT_LEAD_MS / 1000;
+      const idx = findWordIdx(t);
+      if (idx === _activeWordIdx) return;
+
+      // Forward: mark every word we just passed as 'is-spoken' so the reader
+      // has a visible trail of where they've been. Backward (seek-back): unset
+      // the trail past the new position.
+      if (idx > _activeWordIdx) {
+        for (let i = Math.max(0, _activeWordIdx); i < idx; i++) {
+          _wordIndex[i].el.classList.add('is-spoken');
+        }
+      } else if (idx < _activeWordIdx) {
+        for (let i = idx + 1; i <= _activeWordIdx && i < _wordIndex.length; i++) {
+          if (i >= 0) _wordIndex[i].el.classList.remove('is-spoken');
+        }
+      }
+
+      if (_activeWordIdx >= 0 && _activeWordIdx < _wordIndex.length) {
+        _wordIndex[_activeWordIdx].el.classList.remove('is-active');
+      }
+      _activeWordIdx = idx;
+      if (idx < 0) return;
+      const el = _wordIndex[idx].el;
+      el.classList.add('is-active');
+
+      if (Date.now() - _lastUserScrollAt > 3000) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < 80 || rect.bottom > window.innerHeight - 40) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+
+    function startKaraokeLoop() {
+      if (_rafId != null) return;
+      const tick = () => {
+        syncKaraoke();
+        if (audioPlayer.paused) { _rafId = null; return; }
+        _rafId = requestAnimationFrame(tick);
+      };
+      _rafId = requestAnimationFrame(tick);
+    }
+    function stopKaraokeLoop() {
+      if (_rafId != null) { cancelAnimationFrame(_rafId); _rafId = null; }
+      syncKaraoke();  // one final sync after pause/seek so position is exact
+    }
+    audioPlayer.addEventListener('play',    startKaraokeLoop);
+    audioPlayer.addEventListener('playing', startKaraokeLoop);
+    audioPlayer.addEventListener('pause',   stopKaraokeLoop);
+    audioPlayer.addEventListener('seeked',  syncKaraoke);
 
     async function dlFile(fmt) {
       if (!currentJobId) return;
@@ -294,6 +412,87 @@
 
     function escapeHtml(s) {
       return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────────
+
+    function isTypingTarget(el) {
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+    }
+
+    function isResultVisible() {
+      return resultSec && resultSec.style.display !== 'none';
+    }
+
+    function jumpToSegment(delta) {
+      if (!_segmentStarts.length) return;
+      const t = audioPlayer.currentTime;
+      // Find the index of the current segment, then step.
+      let cur = 0;
+      for (let i = 0; i < _segmentStarts.length; i++) {
+        if (_segmentStarts[i] <= t + 0.05) cur = i; else break;
+      }
+      const next = Math.max(0, Math.min(_segmentStarts.length - 1, cur + delta));
+      audioPlayer.currentTime = _segmentStarts[next];
+      audioPlayer.play();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Escape always works (to dismiss overlays) even from inside an input.
+      if (e.key === 'Escape') { closeShortcutsOverlay(); return; }
+      if (isTypingTarget(document.activeElement)) return;
+
+      if (e.key === '?') { toggleShortcutsOverlay(); e.preventDefault(); return; }
+
+      if (!isResultVisible() || !audioPlayer.src) return;
+
+      switch (e.key) {
+        case ' ':
+        case 'k':
+        case 'K':
+          if (audioPlayer.paused) audioPlayer.play(); else audioPlayer.pause();
+          e.preventDefault();
+          break;
+        case 'j':
+        case 'J':
+          audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 5);
+          e.preventDefault();
+          break;
+        case 'l':
+        case 'L':
+          audioPlayer.currentTime = Math.min(audioPlayer.duration || Infinity, audioPlayer.currentTime + 5);
+          e.preventDefault();
+          break;
+        case 'ArrowLeft':
+          audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 2);
+          e.preventDefault();
+          break;
+        case 'ArrowRight':
+          audioPlayer.currentTime = Math.min(audioPlayer.duration || Infinity, audioPlayer.currentTime + 2);
+          e.preventDefault();
+          break;
+        case 'ArrowUp':
+          jumpToSegment(-1);
+          e.preventDefault();
+          break;
+        case 'ArrowDown':
+          jumpToSegment(1);
+          e.preventDefault();
+          break;
+      }
+    });
+
+    function toggleShortcutsOverlay() {
+      const el = document.getElementById('shortcuts-overlay');
+      if (!el) return;
+      el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+    }
+    function closeShortcutsOverlay() {
+      const el = document.getElementById('shortcuts-overlay');
+      if (el) el.style.display = 'none';
     }
 
     // ── Tabs ──────────────────────────────────────────────────────────────────

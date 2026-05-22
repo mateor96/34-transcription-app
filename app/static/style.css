@@ -433,6 +433,14 @@
       margin-bottom: 1.25rem;
       accent-color: var(--accent);
       border-radius: 3px;
+      /* Stick the audio player to the top of the viewport so it stays
+         reachable while reading a long transcript. */
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--bg);
+      padding: 0.5rem 0;
+      box-shadow: 0 1px 0 var(--border);
     }
 
     .transcript-bar {
@@ -477,13 +485,31 @@
       gap: 1.25rem;
       padding: 0.85rem 0;
       border-bottom: 1px solid var(--surface);
-      cursor: pointer;
       transition: background 0.1s;
       border-radius: 3px;
     }
     .turn:hover { background: rgba(0,0,0,0.025); margin: 0 -0.5rem; padding: 0.85rem 0.5rem; }
 
-    .turn-meta { padding-top: 0.15rem; }
+    .turn-meta { padding-top: 0.15rem; cursor: pointer; }
+
+    /* Karaoke — keep the transcript readable at rest (no faded default).
+       Spoken words get a subtle accent-tinted background trail; the active
+       word is fully highlighted. Driven by a 60fps rAF loop in app.js, not
+       the rate-limited timeupdate, so transitions feel smooth not choppy. */
+    .turn-text .w {
+      cursor: pointer;
+      border-radius: 2px;
+      padding: 0 1px;
+      transition: background-color 0.18s ease, color 0.18s ease;
+    }
+    .turn-text .w:hover { background-color: rgba(0,0,0,0.05); }
+    .turn-text .w.is-spoken {
+      background-color: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+    .turn-text .w.is-active {
+      color: var(--bg);
+      background-color: var(--accent);
+    }
 
     .turn-speaker {
       font-size: 0.68rem;
@@ -565,6 +591,44 @@
       transition: color 0.15s, background 0.15s, border-color 0.15s;
     }
     .settings-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Shortcuts overlay ── */
+    #shortcuts-overlay {
+      position: fixed; inset: 0;
+      background: rgba(45, 42, 38, 0.45);
+      z-index: 110;
+      align-items: center;
+      justify-content: center;
+    }
+    .shortcuts-panel {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem 1.75rem;
+      width: min(360px, calc(100vw - 2rem));
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .shortcuts-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .shortcuts-header span {
+      font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
+    }
+    .shortcuts-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .shortcuts-table td { padding: 0.35rem 0; }
+    .shortcuts-table td:first-child { width: 45%; }
+    .shortcuts-table kbd {
+      display: inline-block;
+      min-width: 1.3rem; text-align: center;
+      padding: 0.1rem 0.4rem;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.78rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+    }
 
     /* ── Settings overlay ── */
     #settings-overlay {
