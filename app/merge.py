@@ -1,7 +1,7 @@
 def merge(whisper_result: dict, diarization_turns: list[dict]) -> list[dict]:
     """
-    Assigns a speaker to each word by finding which diarization turn contains
-    the word's midpoint, then groups consecutive same-speaker words into segments.
+    Assigns a speaker to each word by maximum temporal overlap with the
+    diarization turns, then groups consecutive same-speaker words into segments.
     """
     words = [
         {"word": w["word"], "start": w["start"], "end": w["end"], "speaker": None}
@@ -13,19 +13,32 @@ def merge(whisper_result: dict, diarization_turns: list[dict]) -> list[dict]:
         return []
 
     for word in words:
-        midpoint = (word["start"] + word["end"]) / 2
-        word["speaker"] = _find_speaker(midpoint, diarization_turns)
+        word["speaker"] = _find_speaker(word["start"], word["end"], diarization_turns)
 
     return _group_by_speaker(words)
 
 
-def _find_speaker(midpoint: float, turns: list[dict]) -> str:
-    for turn in turns:
-        if turn["start"] <= midpoint <= turn["end"]:
-            return turn["speaker"]
-    # Fall back to nearest turn if midpoint lands in a gap
+def _find_speaker(start: float, end: float, turns: list[dict]) -> str:
+    """Speaker whose turn overlaps the word the most.
+
+    Maximum-overlap beats midpoint-in-turn for words that straddle a speaker
+    change, where the midpoint can land on the wrong side of the boundary.
+    """
     if not turns:
         return "SPEAKER_00"
+
+    best_speaker = None
+    best_overlap = 0.0
+    for turn in turns:
+        overlap = min(end, turn["end"]) - max(start, turn["start"])
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_speaker = turn["speaker"]
+    if best_speaker is not None:
+        return best_speaker
+
+    # No overlap (word sits in a gap) → nearest turn by edge distance.
+    midpoint = (start + end) / 2
     nearest = min(turns, key=lambda t: min(abs(midpoint - t["start"]), abs(midpoint - t["end"])))
     return nearest["speaker"]
 

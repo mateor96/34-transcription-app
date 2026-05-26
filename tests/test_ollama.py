@@ -90,7 +90,11 @@ async def test_stream_chat_skips_blank_lines():
 @respx.mock
 async def test_stream_chat_sends_model_in_payload():
     route = respx.post(f"{URL}/api/chat").mock(
-        return_value=httpx.Response(200, content=json.dumps({"done": True}).encode() + b"\n")
+        return_value=httpx.Response(
+            200,
+            content=json.dumps({"message": {"content": "ok"}, "done": False}).encode() + b"\n"
+            + json.dumps({"done": True}).encode() + b"\n",
+        )
     )
     svc = OllamaService(base_url=URL, model="llama3:8b")
     [_ async for _ in svc.stream_chat("hello")]
@@ -102,7 +106,11 @@ async def test_stream_chat_sends_model_in_payload():
 @respx.mock
 async def test_stream_chat_includes_transcript():
     route = respx.post(f"{URL}/api/chat").mock(
-        return_value=httpx.Response(200, content=json.dumps({"done": True}).encode() + b"\n")
+        return_value=httpx.Response(
+            200,
+            content=json.dumps({"message": {"content": "ok"}, "done": False}).encode() + b"\n"
+            + json.dumps({"done": True}).encode() + b"\n",
+        )
     )
     svc = OllamaService(base_url=URL)
     [_ async for _ in svc.stream_chat("UNIQUE_MARKER")]

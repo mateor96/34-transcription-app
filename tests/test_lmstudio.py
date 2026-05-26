@@ -123,7 +123,7 @@ async def test_stream_chat_ignores_keepalive_and_blank_lines():
 @respx.mock
 async def test_stream_chat_omits_model_field_when_unset():
     route = respx.post(f"{URL}/v1/chat/completions").mock(
-        return_value=httpx.Response(200, content=b'data: [DONE]\n')
+        return_value=httpx.Response(200, content=b'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n')
     )
     svc = LMStudioService(base_url=URL, model="")
     [_ async for _ in svc.stream_chat("hello")]
@@ -137,7 +137,7 @@ async def test_stream_chat_omits_model_field_when_unset():
 @respx.mock
 async def test_stream_chat_passes_model_field_when_set():
     route = respx.post(f"{URL}/v1/chat/completions").mock(
-        return_value=httpx.Response(200, content=b'data: [DONE]\n')
+        return_value=httpx.Response(200, content=b'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n')
     )
     svc = LMStudioService(base_url=URL, model="some-model")
     [_ async for _ in svc.stream_chat("hello")]
@@ -150,7 +150,7 @@ async def test_stream_chat_passes_model_field_when_set():
 @respx.mock
 async def test_stream_chat_includes_transcript_in_prompt():
     route = respx.post(f"{URL}/v1/chat/completions").mock(
-        return_value=httpx.Response(200, content=b'data: [DONE]\n')
+        return_value=httpx.Response(200, content=b'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n')
     )
     svc = LMStudioService(base_url=URL)
     [_ async for _ in svc.stream_chat("UNIQUE_TRANSCRIPT_MARKER")]

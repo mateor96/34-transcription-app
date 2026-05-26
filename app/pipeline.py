@@ -9,6 +9,7 @@ import ffmpeg
 from .transcribe import transcribe
 from .diarize import diarize
 from .merge import merge
+from .vad import detect_speech
 from .db import AUDIO_DIR, save_transcription
 
 _executor = ThreadPoolExecutor(max_workers=4)
@@ -48,16 +49,21 @@ async def run_pipeline(
             ),
         )
 
+        # Detect speech regions up front. Whisper then only decodes these,
+        # which is what stops it hallucinating filler over silence/noise.
+        await emit({"stage": "detecting", "pct": 8, "message": "Detecting speech..."})
+        speech_regions = await loop.run_in_executor(_executor, detect_speech, wav_path)
+
         await emit({"stage": "processing", "pct": 10, "message": "Starting transcription and diarization..."})
 
-        # Whisper writes its 0..1 progress here from a worker thread; the poll
+        # Transcribe reports 0..1 progress here from a worker thread; the poll
         # loop below reads it and forwards real progress to the SSE stream.
         job["whisper_progress"] = 0.0
         def _on_whisper_progress(frac: float) -> None:
             job["whisper_progress"] = frac
 
         transcribe_future = loop.run_in_executor(
-            _executor, transcribe, wav_path, _on_whisper_progress,
+            _executor, transcribe, wav_path, speech_regions, _on_whisper_progress,
         )
         diarize_future = loop.run_in_executor(_executor, diarize, wav_path, min_speakers, max_speakers)
 
