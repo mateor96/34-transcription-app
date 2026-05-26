@@ -46,18 +46,39 @@ class OllamaService:
                             f"Ollama rejected the request: {body[:300] or 'no detail'}",
                             provider=self.provider_name(),
                         )
+                    yielded_content = False
+                    saw_reasoning = False
                     async for line in response.aiter_lines():
                         if not line:
                             continue
                         try:
                             chunk = json.loads(line)
-                            content = chunk.get("message", {}).get("content", "")
+                            message = chunk.get("message", {})
+                            # Reasoning models stream chain-of-thought in `thinking`;
+                            # it's not the answer, so don't surface it.
+                            if message.get("thinking"):
+                                saw_reasoning = True
+                            content = message.get("content", "")
                             if content:
+                                yielded_content = True
                                 yield content
                             if chunk.get("done", False):
                                 break
                         except json.JSONDecodeError:
                             continue
+
+                    # Don't return a blank summary silently — explain why.
+                    if not yielded_content:
+                        if saw_reasoning:
+                            raise ProviderModelError(
+                                "The model only returned reasoning and never wrote the "
+                                "summary. Switch to a non-reasoning model in settings.",
+                                provider=self.provider_name(),
+                            )
+                        raise ProviderModelError(
+                            "The model returned an empty response.",
+                            provider=self.provider_name(),
+                        )
         except httpx.ConnectError:
             raise ProviderUnavailableError(
                 f"Cannot connect to Ollama at {self.base_url}. Run: ollama serve",

@@ -37,13 +37,19 @@ class LMStudioService:
         payload: dict = {
             "messages": [{"role": "user", "content": prompt}],
             "stream": True,
-            "max_tokens": 1024,
+            # Reasoning models ("thinking" models like Qwen3) spend most of their
+            # output budget on chain-of-thought before writing the answer. A small
+            # cap gets exhausted mid-thought, so the answer never arrives. Give
+            # them ample room; non-reasoning models stop early and don't use it.
+            "max_tokens": 8192,
             "temperature": 0.3,
         }
         if self.model:
             payload["model"] = self.model
 
-        timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+        # Read timeout is generous because a reasoning model on a long transcript
+        # can take a minute or more to think through before streaming the answer.
+        timeout = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=5.0)
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream(
@@ -62,6 +68,9 @@ class LMStudioService:
                             f"LM Studio rejected the request: {msg}",
                             provider=self.provider_name(),
                         )
+                    yielded_content = False
+                    saw_reasoning = False
+                    finish_reason = None
                     async for line in response.aiter_lines():
                         if not line.startswith("data: "):
                             continue
@@ -69,12 +78,37 @@ class LMStudioService:
                         if data == "[DONE]":
                             break
                         try:
-                            chunk = json.loads(data)
-                            delta = chunk["choices"][0]["delta"].get("content") or ""
-                            if delta:
-                                yield delta
+                            choice = json.loads(data)["choices"][0]
+                            delta = choice.get("delta", {})
+                            # Reasoning models stream their chain-of-thought in a
+                            # separate field; it isn't the answer, so don't surface
+                            # it — but note it to explain an empty result below.
+                            if delta.get("reasoning_content") or delta.get("reasoning"):
+                                saw_reasoning = True
+                            content = delta.get("content") or ""
+                            if content:
+                                yielded_content = True
+                                yield content
+                            if choice.get("finish_reason"):
+                                finish_reason = choice["finish_reason"]
                         except (json.JSONDecodeError, KeyError, IndexError):
                             continue
+
+                    # No answer text came back. Don't return an empty summary
+                    # silently — explain why so the user can act.
+                    if not yielded_content:
+                        if finish_reason == "length" or saw_reasoning:
+                            raise ProviderModelError(
+                                "The model used its entire output budget thinking and "
+                                "never wrote the summary. This happens with reasoning "
+                                "(\"thinking\") models on long transcripts — switch to a "
+                                "non-reasoning model in settings, or use a shorter input.",
+                                provider=self.provider_name(),
+                            )
+                        raise ProviderModelError(
+                            "The model returned an empty response.",
+                            provider=self.provider_name(),
+                        )
         except httpx.ConnectError:
             raise ProviderUnavailableError(
                 f"Cannot connect to LM Studio at {self.base_url}. Is it running?",
