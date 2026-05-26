@@ -33,13 +33,17 @@ async def run_pipeline(
     try:
         job["status"] = "processing"
 
-        # Normalize to 16 kHz mono WAV
+        # Normalize to 16 kHz mono WAV, with loudness normalization. Quiet
+        # recordings (e.g. a call captured at a low input level) sit near the
+        # noise floor, where Whisper hears "silence" and hallucinates filler
+        # like "Thank you" / "Yeah" on a loop. loudnorm (EBU R128) lifts quiet
+        # speech to a consistent level and leaves already-normal audio intact.
         await emit({"stage": "normalizing", "pct": 5, "message": "Normalizing audio..."})
         await loop.run_in_executor(
             _executor,
             lambda: (
                 ffmpeg.input(audio_path)
-                .output(wav_path, ar=16000, ac=1)
+                .output(wav_path, ar=16000, ac=1, af="loudnorm=I=-16:TP=-1.5:LRA=11")
                 .run(quiet=True, overwrite_output=True)
             ),
         )
