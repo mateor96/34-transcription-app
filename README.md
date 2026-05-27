@@ -6,6 +6,10 @@ Built on [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whis
 
 Handles any audio — meetings, phone calls, voice memos, interviews — without a bot in the call, a cloud upload, or a subscription.
 
+![Nota.ai — a speaker-labeled, click-to-seek transcript with one-click summary and export](docs/screenshot.png)
+
+*Transcript text blurred for privacy.*
+
 ---
 
 ## Features
