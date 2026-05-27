@@ -33,6 +33,18 @@ def test_merge_assigns_speaker_via_word_midpoint():
     assert out[1]["text"]    == "world"
 
 
+def test_merge_uses_max_overlap_not_midpoint():
+    """A word whose midpoint lands in S0's (short) turn but which overlaps S1
+    more must be assigned to S1 — the case max-overlap fixes over midpoint."""
+    words = [{"word": "x", "start": 2.0, "end": 3.0}]  # midpoint 2.5
+    turns = [
+        {"start": 2.4, "end": 2.6, "speaker": "S0"},   # contains midpoint, overlap 0.2
+        {"start": 2.6, "end": 3.0, "speaker": "S1"},   # overlap 0.4
+    ]
+    out = merge(_whisper(words), turns)
+    assert out[0]["speaker"] == "S1"
+
+
 def test_merge_groups_consecutive_same_speaker():
     words = [
         {"word": "Hi",     "start": 0.0, "end": 0.5},
