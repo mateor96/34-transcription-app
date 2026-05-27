@@ -11,7 +11,8 @@ Handles any audio — meetings, phone calls, voice memos, interviews — without
 ## Features
 
 - **Transcription** via Whisper Large v3 Turbo — runs on the M-series GPU through Apple MLX
-- **Speaker diarization** via pyannote community-1 — separates and labels each speaker
+- **Robust on quiet & noisy audio** — voice-activity detection (pyannote segmentation-3.0) feeds only real speech to Whisper, so silence no longer produces hallucinated "Thank you / Yeah" filler loops; language is detected once and pinned across the recording
+- **Speaker diarization** via pyannote community-1 — separates and labels each speaker, with phantom (sub-5%-share) clusters auto-pruned so the speaker count stays right
 - **LLM summarization** — one-click meeting summaries via your choice of model:
   - *Local:* LM Studio, Ollama
   - *Cloud:* Anthropic, OpenAI, Gemini
@@ -66,7 +67,7 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8765
 
 Open [http://127.0.0.1:8765](http://127.0.0.1:8765).
 
-The first transcription will download the Whisper model (~1.5 GB) and pyannote model (~30 MB). After that, everything runs offline.
+The first transcription will download the Whisper model (~1.5 GB) and the pyannote models (~30 MB; diarization + the segmentation model used for voice-activity detection). After that, everything runs offline.
 
 ---
 
@@ -111,12 +112,29 @@ API keys are stored in the macOS Keychain (service: `nota.ai`). Audio and transc
 
 | Layer | Choice |
 |---|---|
-| Transcription | `mlx-whisper` + `mlx-community/whisper-large-v3-turbo` |
+| Transcription | `mlx-whisper` + `mlx-community/whisper-large-v3-turbo`, VAD-gated |
+| Speech detection (VAD) | `pyannote/segmentation-3.0` |
 | Diarization | `pyannote/speaker-diarization-community-1` |
 | Backend | FastAPI + uvicorn + SSE |
 | Storage | SQLite via `aiosqlite` (`~/.transcribe/archive.db`) |
 | Frontend | Vanilla HTML/JS |
-| Audio normalisation | ffmpeg → 16 kHz mono WAV |
+| Audio pipeline | ffmpeg (loudnorm → 16 kHz mono WAV) → VAD → Whisper |
+
+---
+
+## Development
+
+```bash
+uv run pytest                # run the test suite
+python -m app.eval           # score archived transcripts for quality issues
+python -m app.eval --vad     # ...also measure VAD coverage (reads the audio)
+python -m app.eval --baseline quality.json   # save a baseline, then flag regressions on later runs
+```
+
+`app.eval` is a reference-free quality check: with no ground-truth transcript it
+can't grade word accuracy, but it flags failure *signatures* — repetition loops,
+filler-only segments, phantom speakers, words transcribed over silence — so a
+pipeline change that degrades a previously-good recording is caught.
 
 ---
 
