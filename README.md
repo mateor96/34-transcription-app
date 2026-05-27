@@ -28,8 +28,9 @@ Everything runs at `localhost:8765`. No internet required after first setup.
 
 ## Requirements
 
-- Apple Silicon Mac (M1 or later)
+- Apple Silicon Mac (M1 or later) — transcription runs on the M-series GPU via Apple MLX, so this is macOS / Apple Silicon only
 - macOS 13+
+- Python 3.11 — pinned because `pyannote.audio` isn't compatible with 3.12+ yet; `uv` installs the right version for you, no manual setup
 - [uv](https://github.com/astral-sh/uv) — `brew install uv`
 - [ffmpeg](https://ffmpeg.org) — `brew install ffmpeg`
 - A [Hugging Face](https://huggingface.co) account (free)
@@ -41,8 +42,8 @@ Everything runs at `localhost:8765`. No internet required after first setup.
 **1. Clone and install**
 
 ```bash
-git clone https://github.com/mateor96/34-transcription-app.git
-cd 34-transcription-app
+git clone https://github.com/mateor96/nota-ai.git
+cd nota-ai
 uv sync
 ```
 

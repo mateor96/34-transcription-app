@@ -1,8 +1,11 @@
 [project]
-name = "34-transcription-app"
+name = "nota-ai"
 version = "0.1.0"
 description = "Local audio transcription + speaker diarization web app"
 readme = "README.md"
+# Pinned to 3.11: pyannote.audio + its torch/onnxruntime stack are not yet
+# compatible with 3.12+. `uv` installs 3.11 automatically (see .python-version),
+# so no manual pyenv juggling is needed.
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "mlx-whisper>=0.4.0",
